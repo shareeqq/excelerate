@@ -113,6 +113,7 @@ async function main() {
     ["/question/phy-kin-1/solutions", "question-hub-solutions.png", "", "document.querySelector('.question-tabs').scrollIntoView({ block: 'start' })"],
     ["/question/cs-prog-1/solutions/post-1", "solution-comments.png", "", "document.querySelector('.comment-thread').scrollIntoView({ block: 'center' })"],
     ["/code/cs-prog-1", "code-workspace.png", "document.querySelector('[data-run-code]').click()", "document.querySelector('.code-window').scrollIntoView({ block: 'start' })"],
+    ["/code/cs-prog-1", "code-review.png", "(() => { document.querySelector('[data-reset-code]').click(); setTimeout(() => document.querySelector('[data-review-code]').click(), 150); })()", "document.querySelector('.review-card').scrollIntoView({ block: 'start' })"],
     ["/community", "community-filters.png", "", ""],
     ["/assistant", "study-coach.png", "", ""]
   ];
