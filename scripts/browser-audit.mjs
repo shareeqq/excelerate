@@ -381,7 +381,7 @@ check("teacher share lists every question with a subject filter", async (api) =>
   await api.client.evaluate("document.querySelector('[data-share-type][value=questions]').click()");
   await sleep(150);
   const total = await api.client.evaluate("document.querySelectorAll('[data-share-question-row]').length");
-  assert(total === 25, "expected 25 question choices, got " + total);
+  assert(total === 26, "expected 26 question choices, got " + total);
   await api.client.evaluate(`(() => {
     const select = document.querySelector('[data-share-subject]');
     select.value = 'physics';
@@ -541,7 +541,7 @@ check("coach tab, title and roadmap reply", async (api) => {
   assert(empty, "coach should open with an empty conversation");
   assert(seeded === 0, "coach still shows seeded messages: " + seeded);
   const options = await api.client.evaluate("document.querySelectorAll('[data-chat-context] option').length");
-  assert(options === 26, "attach-question list should hold all 25 questions plus the empty option, got " + options);
+  assert(options === 27, "attach-question list should hold all 26 questions plus the empty option, got " + options);
   await api.client.evaluate(`document.querySelector('[data-prompt="Build me a revision roadmap"]').click()`);
   await sleep(250);
   const reply = await api.client.evaluate(`(() => {
@@ -661,7 +661,7 @@ check("attached file shows a contained preview and can be removed", async (api) 
 
 check("physics and CS questions render a 2D figure", async (api) => {
   const withFigures = [
-    "phy-kin-1", "phy-kin-2", "phy-dyn-1", "phy-dyn-2", "phy-energy-1", "phy-energy-2",
+    "phy-kin-1", "phy-kin-2", "phy-dyn-1", "phy-dyn-2", "phy-dyn-3", "phy-energy-1", "phy-energy-2",
     "phy-waves-1", "phy-waves-2", "phy-elec-1", "phy-elec-2", "phy-part-1",
     "cs-ds-2", "cs-bool-1", "cs-alg-1"
   ];
@@ -825,6 +825,33 @@ check("code review stops on a syntax error", async (api) => {
   const text = await api.client.evaluate("document.querySelector('.review-card').innerText");
   assert(/review stopped/i.test(text), "no stopped state: " + text.slice(0, 80));
   assert(/Line 1/.test(text), "line number missing: " + text.slice(0, 80));
+});
+
+check("the dynamics question shows a velocity–time graph", async (api) => {
+  await api.goto("/question/phy-dyn-1");
+  const info = await api.client.evaluate(`(() => {
+    const svg = document.querySelector('[data-inspect="question.figure"] svg');
+    return { shapes: svg ? svg.querySelectorAll('*').length : 0, text: svg ? svg.textContent : '' };
+  })()`);
+  assert(info.shapes > 15, "graph has too few shapes: " + info.shapes);
+  assert(info.text.indexOf("terminal velocity") !== -1, "graph is missing its labels");
+});
+
+check("the diagram workspace models the inclined plane", async (api) => {
+  await api.goto("/diagram/phy-dyn-3");
+  const before = await api.client.evaluate("document.querySelector('[data-out=acceleration]').textContent");
+  const shapesBefore = await api.client.evaluate("document.querySelectorAll('[data-figure-stage] svg *').length");
+  assert(shapesBefore > 10, "the plane drew too few shapes: " + shapesBefore);
+  await api.client.evaluate(`(() => {
+    const angle = document.querySelector('[data-angle-range]');
+    angle.value = '40';
+    angle.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await sleep(150);
+  const after = await api.client.evaluate("document.querySelector('[data-out=acceleration]').textContent");
+  assert(before !== after, "the acceleration did not change with the angle (" + before + ")");
+  const weight = await api.client.evaluate("document.querySelector('[data-out=weight]').textContent");
+  assert(weight.indexOf("39.2") !== -1, "weight readout wrong: " + weight);
 });
 
 const STUDENT_ROUTES = [

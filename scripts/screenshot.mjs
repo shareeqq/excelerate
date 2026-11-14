@@ -115,6 +115,9 @@ async function main() {
     ["/code/cs-prog-1", "code-workspace.png", "document.querySelector('[data-run-code]').click()", "document.querySelector('.code-window').scrollIntoView({ block: 'start' })"],
     ["/code/cs-prog-1", "code-review.png", "(() => { document.querySelector('[data-reset-code]').click(); setTimeout(() => document.querySelector('[data-review-code]').click(), 150); })()", "document.querySelector('.review-card').scrollIntoView({ block: 'start' })"],
     ["/community", "community-filters.png", "", ""],
+    ["/question/phy-dyn-3", "inclined-plane.png", "", "document.querySelector('.figure-box').scrollIntoView({ block: 'center' })"],
+    ["/diagram/phy-dyn-3", "diagram-workspace.png", "", "document.querySelector('[data-figure-stage]').scrollIntoView({ block: 'start' })"],
+    ["/question/phy-dyn-1", "velocity-time.png", "", "document.querySelector('.figure-box').scrollIntoView({ block: 'center' })"],
     ["/assistant", "study-coach.png", "", ""]
   ];
 

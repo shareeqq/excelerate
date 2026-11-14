@@ -1257,47 +1257,67 @@
       }
     }
 
-    var forceRange = screen.querySelector("[data-force-range]");
-    if (forceRange) {
+    var figureStage = screen.querySelector("[data-figure-stage]");
+    if (figureStage) {
       var angleRange = screen.querySelector("[data-angle-range]");
-      var forceGroup = screen.querySelector("[data-force-group]");
-      var forceArrow = screen.querySelector("[data-force-arrow]");
-      var forceHead = screen.querySelector("[data-force-head]");
-      var forceValue = screen.querySelector("[data-force-value]");
-      var angleValue = screen.querySelector("[data-angle-value]");
-      var forceLabel = screen.querySelector("[data-force-label]");
-      var angleLabel = screen.querySelector("[data-angle-label]");
+      var massRange = screen.querySelector("[data-mass-range]");
+      var frictionRange = screen.querySelector("[data-friction-range]");
+      var plainNote = screen.querySelector("[data-plain-note]");
 
-      var updateDiagram = function () {
-        var force = Number(forceRange.value);
-        var angle = Number(angleRange ? angleRange.value : 0);
-        var length = 40 + force * 3;
-        if (forceGroup) forceGroup.setAttribute("transform", "rotate(" + (-angle) + " 180 120)");
-        if (forceArrow) forceArrow.setAttribute("x2", String(180 + length));
-        if (forceHead) {
-          forceHead.setAttribute("points",
-            (180 + length) + ",120 " +
-            (180 + length - 10) + ",114 " +
-            (180 + length - 10) + ",126");
-        }
-        if (forceValue) forceValue.textContent = force + " N";
-        if (angleValue) angleValue.textContent = angle + "°";
-        if (forceLabel) forceLabel.textContent = force + " N";
-        if (angleLabel) angleLabel.textContent = angle + "°";
+      var setOut = function (key, value) {
+        var target = screen.querySelector('[data-out="' + key + '"]');
+        if (target) target.textContent = value;
       };
 
-      forceRange.addEventListener("input", updateDiagram);
-      if (angleRange) angleRange.addEventListener("input", updateDiagram);
+      var updatePlane = function () {
+        var angle = Number(angleRange.value);
+        var mass = Number(massRange.value);
+        var friction = Number(frictionRange.value);
+
+        figureStage.innerHTML = Figures.render({
+          builder: "inclinedPlane",
+          params: {
+            angle: angle,
+            showForces: true,
+            showComponents: true,
+            weightLabel: "W = mg",
+            caption: "Block on a plane inclined at " + angle + "°"
+          }
+        });
+
+        var weight = mass * 9.81;
+        var parallel = weight * Math.sin(angle * Math.PI / 180);
+        var resultant = parallel - friction;
+        var acceleration = resultant > 0 ? resultant / mass : 0;
+
+        setOut("weight", weight.toFixed(1) + " N");
+        setOut("parallel", parallel.toFixed(1) + " N");
+        setOut("resultant", resultant.toFixed(1) + " N");
+        setOut("acceleration", acceleration.toFixed(1) + " m s⁻²");
+
+        var angleValue = screen.querySelector("[data-angle-value]");
+        var massValue = screen.querySelector("[data-mass-value]");
+        var frictionValue = screen.querySelector("[data-friction-value]");
+        if (angleValue) angleValue.textContent = angle + "°";
+        if (massValue) massValue.textContent = mass.toFixed(1) + " kg";
+        if (frictionValue) frictionValue.textContent = friction.toFixed(1) + " N";
+        if (plainNote) plainNote.hidden = resultant > 0;
+      };
+
+      [angleRange, massRange, frictionRange].forEach(function (range) {
+        if (range) range.addEventListener("input", updatePlane);
+      });
 
       var resetDiagram = screen.querySelector("[data-reset-diagram]");
       if (resetDiagram) {
         resetDiagram.addEventListener("click", function () {
-          forceRange.value = "12";
-          if (angleRange) angleRange.value = "30";
-          updateDiagram();
+          angleRange.value = "25";
+          massRange.value = "4";
+          frictionRange.value = "6";
+          updatePlane();
         });
       }
-      updateDiagram();
+      updatePlane();
     }
 
     var communityFilters = screen.querySelector("[data-community-filters]");
@@ -2827,89 +2847,13 @@
 
   /* ---------- 2D figures ---------- */
 
-  function figureArrow(item, stroke, opacity) {
-    var angle = Math.atan2(item.y2 - item.y1, item.x2 - item.x1);
-    var size = 7;
-    var ax = item.x2 - size * Math.cos(angle - 0.42);
-    var ay = item.y2 - size * Math.sin(angle - 0.42);
-    var bx = item.x2 - size * Math.cos(angle + 0.42);
-    var by = item.y2 - size * Math.sin(angle + 0.42);
-    return '<line x1="' + item.x1 + '" y1="' + item.y1 + '" x2="' + item.x2 + '" y2="' + item.y2 +
-      '" fill="none" stroke="' + stroke + '" stroke-width="1.3" opacity="' + opacity + '"/>' +
-      '<path d="M' + item.x2 + " " + item.y2 + " L" + ax.toFixed(1) + " " + ay.toFixed(1) +
-      " L" + bx.toFixed(1) + " " + by.toFixed(1) + ' Z" fill="' + stroke + '" opacity="' + opacity + '"/>';
-  }
-
-  function figureWave(item, stroke, opacity, dash) {
-    var steps = 64;
-    var points = [];
-    var cycles = item.cycles || 4;
-    var phase = item.phase || 0;
-    for (var i = 0; i <= steps; i += 1) {
-      var x = item.x + (item.width * i) / steps;
-      var y = item.y - item.amp * Math.sin((i / steps) * cycles * Math.PI * 2 + phase);
-      points.push((i === 0 ? "M" : "L") + x.toFixed(1) + " " + y.toFixed(1));
-    }
-    return '<path d="' + points.join(" ") + '" fill="none" stroke="' + stroke +
-      '" stroke-width="1.4" opacity="' + opacity + '"' + dash + "/>";
-  }
-
-  function figureItem(item) {
-    var stroke = item.accent ? "var(--brand)" : "currentColor";
-    var opacity = item.muted ? "0.5" : "1";
-    var dash = item.dash ? ' stroke-dasharray="4 4"' : "";
-    var strokeAttr = ' fill="none" stroke="' + stroke + '" stroke-width="1.3" opacity="' + opacity + '"' + dash;
-
-    switch (item.t) {
-      case "line":
-        return '<line x1="' + item.x1 + '" y1="' + item.y1 + '" x2="' + item.x2 + '" y2="' + item.y2 + '"' + strokeAttr + "/>";
-      case "arrow":
-        return figureArrow(item, stroke, opacity);
-      case "rect":
-        return '<rect x="' + item.x + '" y="' + item.y + '" width="' + item.w + '" height="' + item.h +
-          '" fill="' + (item.fill ? "var(--panel)" : "none") + '" stroke="' + stroke +
-          '" stroke-width="1.3" opacity="' + opacity + '"' + dash + "/>";
-      case "circle":
-        return '<circle cx="' + item.cx + '" cy="' + item.cy + '" r="' + item.r +
-          '" fill="' + (item.fill ? "var(--panel)" : "none") + '" stroke="' + stroke +
-          '" stroke-width="1.3" opacity="' + opacity + '"/>';
-      case "path":
-        return '<path d="' + item.d + '" fill="' + (item.fill ? "var(--panel)" : "none") +
-          '" stroke="' + stroke + '" stroke-width="1.3" opacity="' + opacity + '"' + dash + "/>";
-      case "wave":
-        return figureWave(item, stroke, opacity, dash);
-      case "text":
-        return '<text x="' + item.x + '" y="' + item.y + '" fill="' + stroke +
-          '" font-size="' + (item.size || 11) + '" opacity="' + opacity + '"' +
-          ' text-anchor="' + (item.anchor || "start") + '">' + esc(item.text) + "</text>";
-      case "dim": {
-        var vertical = item.x1 === item.x2;
-        var tick = 4;
-        var midX = (item.x1 + item.x2) / 2;
-        var midY = (item.y1 + item.y2) / 2;
-        var ticks = vertical
-          ? '<line x1="' + (item.x1 - tick) + '" y1="' + item.y1 + '" x2="' + (item.x1 + tick) + '" y2="' + item.y1 + '"' + strokeAttr + "/>" +
-            '<line x1="' + (item.x2 - tick) + '" y1="' + item.y2 + '" x2="' + (item.x2 + tick) + '" y2="' + item.y2 + '"' + strokeAttr + "/>"
-          : '<line x1="' + item.x1 + '" y1="' + (item.y1 - tick) + '" x2="' + item.x1 + '" y2="' + (item.y1 + tick) + '"' + strokeAttr + "/>" +
-            '<line x1="' + item.x2 + '" y1="' + (item.y2 - tick) + '" x2="' + item.x2 + '" y2="' + (item.y2 + tick) + '"' + strokeAttr + "/>";
-        return '<line x1="' + item.x1 + '" y1="' + item.y1 + '" x2="' + item.x2 + '" y2="' + item.y2 + '"' + strokeAttr + "/>" + ticks +
-          '<text x="' + midX + '" y="' + (vertical ? midY : midY - 6) + '" fill="' + stroke +
-          '" font-size="10" opacity="' + opacity + '" text-anchor="middle">' + esc(item.label) + "</text>";
-      }
-      default:
-        return "";
-    }
-  }
-
   function QuestionFigure(question) {
     var spec = FIGURES[question.id];
     if (!spec) return "";
     return `
       <figure class="figure-box" data-inspect="question.figure">
-        <svg class="figure" viewBox="0 0 ${spec.width} ${spec.height}" role="img" aria-label="${esc(spec.caption)}">
-          ${spec.items.map(figureItem).join("")}
-        </svg>
-        <figcaption class="muted">${esc(spec.caption)}</figcaption>
+        ${Figures.render(spec)}
+        <figcaption class="muted">${esc(Figures.caption(spec))}</figcaption>
       </figure>`;
   }
 
@@ -4217,7 +4161,7 @@
         <div class="page-head">
           <p class="eyebrow">Physics · Diagram workspace</p>
           <h1 class="page-title">${esc(topic ? topic.name : "Diagram question")}</h1>
-          <p class="lede">Adjust the diagram to match the situation, then write your answer below.</p>
+          <p class="lede">Change the angle, the mass and the friction, and watch the forces resolve. Then write your answer below.</p>
         </div>
 
         <section class="card card--plain" data-inspect="diagram.question">
@@ -4235,43 +4179,52 @@
               <h2 class="section-title">Diagram</h2>
               <button type="button" class="btn btn--ghost btn--small" data-reset-diagram>Reset diagram</button>
             </div>
-            <div class="diagram-stage">
-              <svg viewBox="0 0 360 220" role="img" aria-label="Force diagram with an adjustable force and angle">
-                <line x1="40" y1="180" x2="320" y2="180" stroke="currentColor" opacity="0.35"></line>
-                <rect x="150" y="130" width="60" height="50" fill="none" stroke="currentColor"></rect>
-                <text x="180" y="160" text-anchor="middle" fill="currentColor" font-size="11">block</text>
-                <line x1="180" y1="120" x2="330" y2="120" stroke="currentColor" stroke-dasharray="4 4" opacity="0.5"></line>
-                <g data-force-group transform="rotate(-30 180 120)">
-                  <line data-force-arrow x1="180" y1="120" x2="300" y2="120" stroke="currentColor" stroke-width="2"></line>
-                  <polygon data-force-head points="300,120 290,114 290,126" fill="currentColor"></polygon>
-                </g>
-                <text data-force-label x="250" y="86" fill="currentColor" font-size="12">12 N</text>
-                <text data-angle-label x="228" y="108" fill="currentColor" font-size="12">30°</text>
-              </svg>
+            <div class="diagram-stage" data-figure-stage>
+              ${Figures.render({
+                builder: "inclinedPlane",
+                params: {
+                  angle: 25,
+                  showForces: true,
+                  showComponents: true,
+                  weightLabel: "W = mg",
+                  caption: "Block on a plane inclined at 25°"
+                }
+              })}
             </div>
             <div class="diagram-controls">
               <div class="field">
-                <label class="field__label" for="force-range">Force <span data-force-value>12 N</span></label>
-                <input class="range" id="force-range" type="range" min="2" max="30" value="12" data-force-range>
+                <label class="field__label" for="angle-range">Angle <span data-angle-value>25°</span></label>
+                <input class="range" id="angle-range" type="range" min="5" max="45" value="25" step="1" data-angle-range>
               </div>
               <div class="field">
-                <label class="field__label" for="angle-range">Angle <span data-angle-value>30°</span></label>
-                <input class="range" id="angle-range" type="range" min="0" max="60" value="30" data-angle-range>
+                <label class="field__label" for="mass-range">Mass <span data-mass-value>4.0 kg</span></label>
+                <input class="range" id="mass-range" type="range" min="1" max="20" value="4" step="0.5" data-mass-range>
+              </div>
+              <div class="field">
+                <label class="field__label" for="friction-range">Friction <span data-friction-value>6.0 N</span></label>
+                <input class="range" id="friction-range" type="range" min="0" max="20" value="6" step="0.5" data-friction-range>
               </div>
             </div>
+            <dl class="kv diagram-readout">
+              <dt>Weight</dt><dd data-out="weight">39.2 N</dd>
+              <dt>Down the slope</dt><dd data-out="parallel">16.6 N</dd>
+              <dt>Resultant</dt><dd data-out="resultant">10.6 N</dd>
+              <dt>Acceleration</dt><dd data-out="acceleration">2.6 m s⁻²</dd>
+            </dl>
+            <p class="field__hint" data-plain-note hidden>The block stays at rest: friction is at least as large as the component of weight down the slope.</p>
           </section>
 
           <section class="flow--tight" data-inspect="diagram.notes">
             <div class="section-head">
               <h2 class="section-title">What the diagram shows</h2>
             </div>
-            <p class="muted">The block is pulled by a force at an angle to the horizontal. Change the force and angle to see how the arrow moves.</p>
+            <p class="muted">The block sits on a rough plane. Its weight resolves into a component down the slope and a component into the slope; friction acts up the slope.</p>
             <ul class="check-list">
-              <li class="check-item"><span class="check-dot" aria-hidden="true"></span><span>Only the component along the surface does work.</span></li>
-              <li class="check-item"><span class="check-dot" aria-hidden="true"></span><span>Increasing the angle changes the horizontal and vertical components.</span></li>
-              <li class="check-item"><span class="check-dot" aria-hidden="true"></span><span>Reset returns the diagram to the values in the question.</span></li>
+              <li class="check-item"><span class="check-dot" aria-hidden="true"></span><span>The component down the slope is mg sin θ; the component into the slope is mg cos θ.</span></li>
+              <li class="check-item"><span class="check-dot" aria-hidden="true"></span><span>The block slides when mg sin θ is greater than the friction.</span></li>
+              <li class="check-item"><span class="check-dot" aria-hidden="true"></span><span>The acceleration is the resultant force down the slope divided by the mass.</span></li>
             </ul>
-            <p class="field__hint">This is a placeholder diagram. The real tool would draw the exact setup for the question.</p>
+            <p class="field__hint">A model built from the question's numbers. It is a teaching aid, not the marking scheme.</p>
           </section>
         </div>
 

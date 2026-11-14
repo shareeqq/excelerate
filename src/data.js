@@ -215,6 +215,35 @@ const QUESTIONS = [
     feedback: "Subtract friction before dividing. The result is positive, so the crate accelerates in the direction of the pull."
   },
   {
+    id: "phy-dyn-3",
+    subjectId: "physics",
+    topicId: "phy-dynamics",
+    kind: "past",
+    source: "9702 Paper 2, 2024",
+    year: 2024,
+    paper: 2,
+    marks: 4,
+    difficulty: "Medium",
+    stem: "A block of mass 4.0 kg slides down a rough plane inclined at 25° to the horizontal. The frictional force acting on the block is 6.0 N. Calculate the acceleration of the block along the plane.",
+    diagram: null,
+    attempted: false,
+    awarded: null,
+    markScheme: [
+      { point: "Resolves the weight along the slope: 4.0 × 9.81 × sin 25° (= 16.6 N)", earned: true },
+      { point: "Subtracts friction: 16.6 − 6.0 = 10.6 N", earned: true },
+      { point: "Uses a = F / m", earned: true },
+      { point: "a = 2.6 m s⁻²", earned: true }
+    ],
+    feedback: "Resolve the weight on the slope first, subtract friction to get the resultant, then divide by the mass.",
+    workedSteps: [
+      "Resolve the weight parallel to the slope: W∥ = mg sin 25°.",
+      "W∥ = 4.0 × 9.81 × sin 25° = 16.6 N.",
+      "Subtract friction: 16.6 − 6.0 = 10.6 N down the slope.",
+      "Use a = F / m = 10.6 / 4.0.",
+      "Final line: a = 2.6 m s⁻² down the slope."
+    ]
+  },
+  {
     id: "phy-energy-1",
     subjectId: "physics",
     topicId: "phy-energy",
@@ -726,35 +755,40 @@ const FIGURES = {
     ]
   },
   "phy-dyn-1": {
-    caption: "Forces on a falling object with drag",
-    width: 360,
-    height: 200,
-    items: [
-      { t: "circle", cx: 180, cy: 84, r: 24 },
-      { t: "arrow", x1: 180, y1: 58, x2: 180, y2: 18, accent: true },
-      { t: "text", x: 190, y: 34, text: "drag", size: 10 },
-      { t: "arrow", x1: 180, y1: 110, x2: 180, y2: 156, accent: true },
-      { t: "text", x: 190, y: 142, text: "W = mg", size: 10 },
-      { t: "text", x: 180, y: 186, text: "as v rises, drag rises, so the resultant falls", size: 10, anchor: "middle" }
-    ]
+    caption: "Velocity–time graph for a falling object with drag",
+    builder: "velocityTime",
+    params: {
+      terminal: 40,
+      tau: 6,
+      tMax: 30,
+      tangentAt: 9,
+      caption: "Velocity–time graph for a falling object with drag"
+    }
   },
   "phy-dyn-2": {
-    caption: "A crate pulled across a rough floor",
-    width: 360,
-    height: 200,
-    items: [
-      { t: "line", x1: 20, y1: 160, x2: 120, y2: 160 },
-      { t: "line", x1: 240, y1: 160, x2: 340, y2: 160 },
-      { t: "rect", x: 140, y: 98, w: 80, h: 62 },
-      { t: "arrow", x1: 222, y1: 130, x2: 312, y2: 130, accent: true },
-      { t: "text", x: 232, y: 120, text: "90 N", size: 10 },
-      { t: "arrow", x1: 138, y1: 130, x2: 56, y2: 130, accent: true },
-      { t: "text", x: 56, y: 120, text: "35 N", size: 10 },
-      { t: "arrow", x1: 180, y1: 96, x2: 180, y2: 56, accent: true },
-      { t: "text", x: 190, y: 74, text: "N", size: 10 },
-      { t: "arrow", x1: 180, y1: 162, x2: 180, y2: 194, accent: true },
-      { t: "text", x: 190, y: 186, text: "W", size: 10 }
-    ]
+    caption: "Forces on a crate pulled across a rough floor",
+    builder: "freeBody",
+    params: {
+      shape: "rect",
+      caption: "Forces on a crate pulled across a rough floor",
+      forces: [
+        { label: "90 N", angle: 0, length: 62 },
+        { label: "35 N", angle: 180, length: 46 },
+        { label: "N", angle: 90, length: 52 },
+        { label: "W", angle: -90, length: 52 }
+      ]
+    }
+  },
+  "phy-dyn-3": {
+    caption: "Block sliding down a rough plane inclined at 25°",
+    builder: "inclinedPlane",
+    params: {
+      angle: 25,
+      showForces: true,
+      showComponents: true,
+      weightLabel: "W = mg",
+      caption: "Block sliding down a rough plane inclined at 25°"
+    }
   },
   "phy-energy-1": {
     caption: "A spring compressed by 0.12 m",
@@ -959,6 +993,7 @@ const FIGURES = {
 const QUESTION_HISTORY = {
   "phy-kin-1": { years: [2023, 2021, 2019, 2018], papers: [2, 2, 1, 2], frequency: 4 },
   "phy-dyn-1": { years: [2022, 2020, 2017], papers: [2, 3, 2], frequency: 3 },
+  "phy-dyn-3": { years: [2024, 2022], papers: [2, 2], frequency: 2 },
   "cs-prog-1": { years: [2023, 2022, 2020], papers: [2, 2, 1], frequency: 3 },
   "cs-db-1": { years: [2022, 2019], papers: [1, 2], frequency: 2 },
   "phy-waves-1": { years: [2023, 2021], papers: [2, 2], frequency: 2 },
@@ -2943,7 +2978,7 @@ const INSPECT_NOTES = {
   "diagram.canvas": {
     title: "Adjustable diagram",
     lines: [
-      "The force and angle sliders move the arrow and update the labels.",
+      "The angle, mass and friction sliders redraw the plane and resolve the weight.",
       "Reset diagram returns it to the values in the question."
     ]
   },

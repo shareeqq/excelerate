@@ -35,6 +35,11 @@ vm.createContext(pseudoContext);
 vm.runInContext(read("src/pseudo.js"), pseudoContext);
 const Pseudo = pseudoContext.Pseudo;
 
+const figuresContext = { console };
+vm.createContext(figuresContext);
+vm.runInContext(read("src/figures.js"), figuresContext);
+const Figures = figuresContext.Figures;
+
 const app = read("src/app.js");
 const css = read("src/styles.css");
 const html = read("index.html");
@@ -206,6 +211,7 @@ test("build is self-contained", () => {
   if (!build) return;
   assert(!build.includes("src/styles.css"), "external CSS reference");
   assert(!build.includes("src/pseudo.js"), "external runner reference");
+  assert(!build.includes("src/figures.js"), "external figures reference");
   assert(!build.includes("src/data.js"), "external data reference");
   assert(!build.includes("src/app.js"), "external app reference");
   assert(build.includes("var Pseudo = "), "the pseudocode runner was not inlined");
@@ -238,14 +244,19 @@ test("pseudocode runner handles functions, loops and input", () => {
   assert(!missing.ok && /input/i.test(missing.error), "missing input not reported");
 });
 
-test("every question figure is drawable", () => {
+test("every question figure draws", () => {
   const ids = Object.keys(data.FIGURES);
   assert(ids.length >= 14, "expected at least 14 figures, got " + ids.length);
+  ["inclinedPlane", "velocityTime", "freeBody"].forEach((name) => {
+    assert(typeof Figures.builders[name] === "function", "missing the " + name + " builder");
+  });
   ids.forEach((id) => {
     const spec = data.FIGURES[id];
-    assert(spec.caption && Array.isArray(spec.items), "figure " + id + " is incomplete");
-    assert(spec.items.length > 4, "figure " + id + " has too few shapes");
-    spec.items.forEach((item) => assert(item.t, "figure " + id + " has a shape without a type"));
+    const svg = Figures.render(spec);
+    assert(svg.indexOf("<svg") === 0, id + " did not render an SVG");
+    const shapes = (svg.match(/<(line|path|rect|circle|polygon|text|g)\b/g) || []).length;
+    assert(shapes >= 4, id + " rendered only " + shapes + " shapes");
+    assert(Figures.caption(spec), id + " has no caption");
   });
 });
 
