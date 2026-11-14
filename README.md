@@ -101,7 +101,9 @@ The strip above the app is deliberately outside it:
 - S15 Teacher notes (student view) grouped by topic, with a New badge for unseen notes.
 - S16 Notifications for each role, with read and unread states; every item opens the related screen.
 - S17 Teacher dashboard with classes, student counts, class codes and Create class.
-- S18 Class detail with a student progress list and everything shared with the class.
+- S18 Class detail with a student progress list and everything shared with the class, plus a **question performance** list.
+- S18A Question insight: one class on one question — attempts, average, each mark-scheme point with the share who missed it, and a mark distribution.
+- S18B Student detail: one learner's recent attempts and marks per topic, with the weakest topic called out.
 - S19 Share notes or questions: choose classes, write or upload a note, or pick questions from the whole bank with a subject filter, then send.
 
 **Phase 5 — Final pass**

@@ -1480,6 +1480,112 @@ const CLASS_SHARED = {
   ]
 };
 
+/* Per-question performance for each class. `missed` lists the mark-scheme
+   points the class lost most often, with the percentage who missed them. */
+const CLASS_ATTEMPTS = {
+  "class-1": {
+    "cs-prog-1": {
+      attempts: 22,
+      average: 3.4,
+      distribution: [0, 1, 6, 9, 4, 2],
+      missed: [{ index: 4, percent: 62 }, { index: 0, percent: 31 }]
+    },
+    "cs-db-1": {
+      attempts: 19,
+      average: 2.1,
+      distribution: [0, 2, 8, 7, 2],
+      missed: [{ index: 2, percent: 58 }, { index: 1, percent: 22 }]
+    },
+    "cs-alg-1": {
+      attempts: 17,
+      average: 2.8,
+      distribution: [0, 2, 5, 7, 2, 1],
+      missed: [{ index: 4, percent: 71 }]
+    }
+  },
+  "class-2": {
+    "phy-kin-1": {
+      attempts: 18,
+      average: 2.6,
+      distribution: [0, 1, 5, 8, 4],
+      missed: [{ index: 3, percent: 67 }, { index: 2, percent: 28 }]
+    },
+    "phy-kin-2": {
+      attempts: 15,
+      average: 2.4,
+      distribution: [0, 2, 6, 5, 2],
+      missed: [{ index: 3, percent: 55 }]
+    }
+  }
+};
+
+/* A few students have their own history and skill breakdown. Students
+   without an entry show their progress and an empty state. */
+const STUDENT_DETAIL = {
+  "class-1:0": {
+    attempts: [
+      { questionId: "cs-prog-1", awarded: 4, total: 5, date: "2026-11-08" },
+      { questionId: "cs-db-1", awarded: 2, total: 3, date: "2026-11-05" },
+      { questionId: "cs-alg-1", awarded: 3, total: 5, date: "2026-10-30" }
+    ],
+    skills: [
+      { topicId: "cs-programming", percent: 72 },
+      { topicId: "cs-databases", percent: 81 },
+      { topicId: "cs-algorithms", percent: 58 }
+    ]
+  },
+  "class-1:1": {
+    attempts: [
+      { questionId: "cs-prog-1", awarded: 3, total: 5, date: "2026-11-07" },
+      { questionId: "cs-alg-1", awarded: 2, total: 5, date: "2026-11-02" }
+    ],
+    skills: [
+      { topicId: "cs-programming", percent: 61 },
+      { topicId: "cs-algorithms", percent: 44 }
+    ]
+  },
+  "class-1:2": {
+    attempts: [
+      { questionId: "cs-prog-1", awarded: 5, total: 5, date: "2026-11-09" },
+      { questionId: "cs-db-1", awarded: 3, total: 3, date: "2026-11-06" }
+    ],
+    skills: [
+      { topicId: "cs-programming", percent: 93 },
+      { topicId: "cs-databases", percent: 88 }
+    ]
+  },
+  "class-2:0": {
+    attempts: [
+      { questionId: "phy-kin-1", awarded: 4, total: 4, date: "2026-11-10" },
+      { questionId: "phy-kin-2", awarded: 3, total: 4, date: "2026-11-04" }
+    ],
+    skills: [
+      { topicId: "phy-kinematics", percent: 86 },
+      { topicId: "phy-dynamics", percent: 64 }
+    ]
+  },
+  "class-2:1": {
+    attempts: [
+      { questionId: "phy-kin-1", awarded: 2, total: 4, date: "2026-11-08" },
+      { questionId: "phy-kin-2", awarded: 2, total: 4, date: "2026-11-01" }
+    ],
+    skills: [
+      { topicId: "phy-kinematics", percent: 62 },
+      { topicId: "phy-dynamics", percent: 48 }
+    ]
+  },
+  "class-2:2": {
+    attempts: [
+      { questionId: "phy-kin-1", awarded: 4, total: 4, date: "2026-11-09" },
+      { questionId: "phy-kin-2", awarded: 4, total: 4, date: "2026-11-03" }
+    ],
+    skills: [
+      { topicId: "phy-kinematics", percent: 94 },
+      { topicId: "phy-dynamics", percent: 79 }
+    ]
+  }
+};
+
 /* ------------------------------------------------------------
    Screen map — every screen, its phase and a plain-language note
    ------------------------------------------------------------ */
@@ -1799,6 +1905,36 @@ const SCREENS = [
     note: "One class at a time: who is in it, how they are doing and what they have been given.",
     status: "built",
     route: "/class/class-1"
+  },
+  {
+    id: "s18a",
+    code: "S18A",
+    name: "Question insight",
+    phase: 4,
+    summary: "How one class performed on one question, mark-scheme point by point.",
+    contents: [
+      "Attempts, average mark and the class size",
+      "Each mark-scheme point with the share who missed it",
+      "A mark distribution to see the spread"
+    ],
+    note: "Turns a shared question into a teaching decision: which point to reteach next lesson.",
+    status: "built",
+    route: "/insight/class-1/cs-prog-1"
+  },
+  {
+    id: "s18b",
+    code: "S18B",
+    name: "Student detail",
+    phase: 4,
+    summary: "One student's recent attempts and marks per topic.",
+    contents: [
+      "Progress, attempts shown and marks earned",
+      "Recent attempts with their marks",
+      "Skill breakdown with the weakest topic called out"
+    ],
+    note: "The teacher's view of a single learner: what they tried, how they did and where to help.",
+    status: "built",
+    route: "/student/class-1/0"
   },
   {
     id: "s19",
@@ -2925,6 +3061,83 @@ const INSPECT_NOTES = {
     lines: [
       "A note opens with its full text; a question set lists the questions inside.",
       "It is a record of what was sent, not a new place to edit it."
+    ]
+  },
+  "class.questions": {
+    title: "Question performance",
+    lines: [
+      "Every question this class has worked on, with attempts and the average mark.",
+      "Opening one shows exactly which mark-scheme points the class missed."
+    ]
+  },
+  "class.questionRow": {
+    title: "One question",
+    lines: [
+      "The question, its topic, its marks and how the class did on average.",
+      "It opens the insight screen for that question and class."
+    ]
+  },
+  "insight.intro": {
+    title: "Question insight",
+    lines: [
+      "One question seen through one class's results.",
+      "It is the teacher's version of the Stats tab: not how often a question appears, but how the class answered it."
+    ]
+  },
+  "insight.stats": {
+    title: "Result summary",
+    lines: [
+      "Attempts, average mark and how many students are shown.",
+      "Averages are whole marks, matching how the paper is marked."
+    ]
+  },
+  "insight.markscheme": {
+    title: "Where the class lost marks",
+    lines: [
+      "Each mark-scheme point, with the share of attempts that missed it.",
+      "The points with a high missed share are the ones worth reteaching."
+    ]
+  },
+  "insight.distribution": {
+    title: "Mark distribution",
+    lines: [
+      "How many attempts landed on each mark from 0 to the total.",
+      "A tall bar near the top means the question is secure; a spread means it is not."
+    ]
+  },
+  "student.intro": {
+    title: "Student detail",
+    lines: [
+      "One student in one class, for the teacher.",
+      "It gathers their recent attempts and their marks per topic."
+    ]
+  },
+  "student.stats": {
+    title: "At a glance",
+    lines: [
+      "Progress, how many attempts are shown and the share of marks earned.",
+      "The prototype keeps detailed history for a few students only."
+    ]
+  },
+  "student.attempts": {
+    title: "Recent attempts",
+    lines: [
+      "Newest first, with the question, the date and the mark.",
+      "It is a record for the teacher, not a place to re-mark."
+    ]
+  },
+  "student.attempt": {
+    title: "One attempt",
+    lines: [
+      "The topic, the question and the mark for that attempt.",
+      "Several attempts on the same question show as separate rows."
+    ]
+  },
+  "student.skills": {
+    title: "Skill breakdown",
+    lines: [
+      "Marks per topic, as a simple bar.",
+      "The weakest topic is called out so the next conversation has a starting point."
     ]
   },
   "share.intro": {

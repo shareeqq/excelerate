@@ -114,10 +114,12 @@ async function main() {
     ["/question/cs-prog-1/solutions/post-1", "solution-comments.png", "", "document.querySelector('.comment-thread').scrollIntoView({ block: 'center' })"],
     ["/code/cs-prog-1", "code-workspace.png", "document.querySelector('[data-run-code]').click()", "document.querySelector('.code-window').scrollIntoView({ block: 'start' })"],
     ["/code/cs-prog-1", "code-review.png", "(() => { document.querySelector('[data-reset-code]').click(); setTimeout(() => document.querySelector('[data-review-code]').click(), 150); })()", "document.querySelector('.review-card').scrollIntoView({ block: 'start' })"],
-    ["/community", "community-filters.png", "", ""],
-    ["/question/phy-dyn-3", "inclined-plane.png", "", "document.querySelector('.figure-box').scrollIntoView({ block: 'center' })"],
-    ["/diagram/phy-dyn-3", "diagram-workspace.png", "", "document.querySelector('[data-figure-stage]').scrollIntoView({ block: 'start' })"],
-    ["/question/phy-dyn-1", "velocity-time.png", "", "document.querySelector('.figure-box').scrollIntoView({ block: 'center' })"],
+    ["/community", "community-filters.png", "", "", "student"],
+    ["/insight/class-1/cs-prog-1", "teacher-insight.png", "", "document.querySelector('.dist').scrollIntoView({ block: 'center' })", "teacher"],
+    ["/student/class-1/0", "teacher-student.png", "", "", "teacher"],
+    ["/question/phy-dyn-3", "inclined-plane.png", "", "document.querySelector('.figure-box').scrollIntoView({ block: 'center' })", "student"],
+    ["/diagram/phy-dyn-3", "diagram-workspace.png", "", "document.querySelector('[data-figure-stage]').scrollIntoView({ block: 'start' })", "student"],
+    ["/question/phy-dyn-1", "velocity-time.png", "", "document.querySelector('.figure-box').scrollIntoView({ block: 'center' })", "student"],
     ["/question/phy-kin-1/walkthrough", "walkthrough.png", `(() => {
       const scrub = document.querySelector('[data-player-scrub]');
       scrub.value = '2';
@@ -126,7 +128,14 @@ async function main() {
     ["/assistant", "study-coach.png", "", ""]
   ];
 
-  for (const [route, file, prepare, focus] of shots) {
+  for (const [route, file, prepare, focus, role] of shots) {
+    if (role) {
+      await evaluate(`(() => {
+        const button = document.querySelector('[data-role="${role}"]');
+        if (button && button.getAttribute('aria-pressed') !== 'true') button.click();
+      })()`);
+      await sleep(300);
+    }
     await evaluate(`location.hash = ${JSON.stringify(route)}`);
     await sleep(450);
     if (prepare) {

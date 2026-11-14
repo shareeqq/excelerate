@@ -3184,6 +3184,54 @@ a.subject-card:hover {
   font-size: var(--text-sm);
 }
 
+/* ---------- Teacher insight and student detail ---------- */
+
+a.student-row {
+  display: flex;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.student-row:hover {
+  background: var(--panel);
+}
+
+.dist {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  height: 132px;
+  padding: var(--space-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.dist__bucket {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dist__bar {
+  width: 100%;
+  max-width: 34px;
+  background: var(--brand);
+  border-radius: var(--radius);
+}
+
+.dist__count,
+.dist__label {
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
 .chat-empty {
   display: flex;
   flex-direction: column;

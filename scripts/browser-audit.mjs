@@ -892,6 +892,52 @@ check("the walkthrough scrubs to the last step", async (api) => {
   assert(state.paths >= 4, "the last step should show every mark");
 });
 
+check("class detail links to insight and student detail", async (api) => {
+  await api.role("teacher");
+  await api.goto("/class/class-1");
+  const links = await api.client.evaluate(
+    "Array.from(document.querySelectorAll('#screen a')).map((a) => a.getAttribute('href')).filter(Boolean)"
+  );
+  assert(links.some((href) => href.indexOf("/insight/class-1/") !== -1), "no question insight link");
+  assert(links.some((href) => href.indexOf("/student/class-1/") !== -1), "no student detail link");
+});
+
+check("question insight shows where the class lost marks", async (api) => {
+  await api.role("teacher");
+  await api.goto("/insight/class-1/cs-prog-1");
+  const state = await api.client.evaluate(`(() => ({
+    text: document.querySelector('#screen').innerText,
+    missed: document.querySelectorAll('.mark-point .badge--brand').length,
+    bars: document.querySelectorAll('.dist__bar').length
+  }))()`);
+  assert(state.text.indexOf("22") !== -1, "attempt count missing");
+  assert(/62% missed/i.test(state.text), "missed percentage missing");
+  assert(state.missed >= 1, "no mark-scheme point marked as missed");
+  assert(state.bars === 6, "expected six distribution bars, got " + state.bars);
+});
+
+check("student detail shows attempts and skills", async (api) => {
+  await api.role("teacher");
+  await api.goto("/student/class-1/0");
+  const state = await api.client.evaluate(`(() => ({
+    text: document.querySelector('#screen').innerText,
+    attempts: document.querySelectorAll('[data-inspect="student.attempt"]').length,
+    skills: document.querySelectorAll('.mark-topic').length
+  }))()`);
+  assert(state.text.indexOf("Aisha Khan") !== -1, "student name missing");
+  assert(state.attempts === 3, "expected three attempts, got " + state.attempts);
+  assert(state.skills === 3, "expected three skill bars, got " + state.skills);
+  assert(/Weakest topic/.test(state.text), "weakest topic missing");
+});
+
+check("a student without detail shows the empty state", async (api) => {
+  await api.role("teacher");
+  await api.goto("/student/class-1/5");
+  const text = await api.client.evaluate("document.querySelector('#screen').innerText");
+  assert(/No attempts recorded yet/.test(text), "no empty state");
+  await api.role("student");
+});
+
 const STUDENT_ROUTES = [
   "/", "/foundations", "/sitemap", "/login", "/topics", "/topics/cs", "/topics/physics",
   "/topic/phy-kinematics", "/topic/phy-kinematics/practice", "/topic/cs-databases",
@@ -903,7 +949,7 @@ const STUDENT_ROUTES = [
   "/diagram/phy-dyn-1", "/assistant", "/progress", "/community", "/post-solution",
   "/notes", "/notifications", "/profile"
 ];
-const TEACHER_ROUTES = ["/dashboard", "/classes", "/class/class-1", "/share", "/community", "/notifications", "/profile"];
+const TEACHER_ROUTES = ["/dashboard", "/classes", "/class/class-1", "/insight/class-1/cs-prog-1", "/student/class-1/0", "/share", "/community", "/notifications", "/profile"];
 const REVIEWER_ROUTES = ["/queue", "/review/rev-1", "/community", "/notifications", "/profile"];
 
 check("every route renders a screen without overflow", async (api) => {

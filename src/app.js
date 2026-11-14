@@ -44,7 +44,7 @@
   var STUDENT_EXTRA_ROUTES = ["/notes", "/post-solution"];
 
   var STUDENT_DETAIL_PREFIXES = ["/topics/", "/topic/", "/question/", "/result/", "/code/", "/diagram/"];
-  var TEACHER_DETAIL_PREFIXES = ["/class/"];
+  var TEACHER_DETAIL_PREFIXES = ["/class/", "/insight/", "/student/"];
   var REVIEWER_DETAIL_PREFIXES = ["/review/"];
 
   var PHASE_TITLES = {
@@ -231,6 +231,14 @@
     if (route.indexOf("/code/") === 0) return { name: "code", id: route.slice(6) };
     if (route.indexOf("/diagram/") === 0) return { name: "diagram", id: route.slice(9) };
     if (route.indexOf("/class/") === 0) return { name: "class", id: route.slice(7) };
+    if (route.indexOf("/insight/") === 0) {
+      var insightParts = route.slice(9).split("/");
+      return { name: "insight", classId: insightParts[0], questionId: insightParts[1] };
+    }
+    if (route.indexOf("/student/") === 0) {
+      var studentParts = route.slice(9).split("/");
+      return { name: "student", classId: studentParts[0], index: Number(studentParts[1]) };
+    }
     return null;
   }
 
@@ -671,6 +679,10 @@
         screen.innerHTML = DiagramScreen(detail.id);
       } else if (detail.name === "class") {
         screen.innerHTML = ClassDetailScreen(detail.id);
+      } else if (detail.name === "insight") {
+        screen.innerHTML = QuestionInsightScreen(detail.classId, detail.questionId);
+      } else if (detail.name === "student") {
+        screen.innerHTML = StudentDetailScreen(detail.classId, detail.index);
       } else {
         screen.innerHTML = ResultScreen(detail.id);
       }
@@ -4764,9 +4776,18 @@
     var subject = subjectById(cls.subjectId);
     var students = CLASS_STUDENTS[cls.id] || [];
     var shared = CLASS_SHARED[cls.id] || [];
+    var classStats = CLASS_ATTEMPTS[cls.id] || {};
     var average = students.length ? Math.round(students.reduce(function (total, student) {
       return total + student.progress;
     }, 0) / students.length) : 0;
+
+    var trackedQuestions = Object.keys(classStats);
+    shared.forEach(function (item) {
+      if (item.type !== "questions") return;
+      item.questionIds.forEach(function (questionId) {
+        if (trackedQuestions.indexOf(questionId) === -1) trackedQuestions.push(questionId);
+      });
+    });
 
     return `
       <div class="screen screen--wide flow" data-inspect="class.intro">
@@ -4799,15 +4820,18 @@
           </div>
           ${state.listState === "default" ? (students.length ? `
             <ul class="list student-list">
-              ${students.map(function (student) {
+              ${students.map(function (student, index) {
                 return `
-                  <li class="student-row" data-inspect="class.student">
-                    <div class="student-row__main">
-                      <span class="student-row__name">${esc(student.name)}</span>
-                      <span class="student-row__meta">Last active ${esc(student.lastActive)}</span>
-                      <span class="bar" aria-hidden="true"><span style="width:${student.progress}%"></span></span>
-                    </div>
-                    <span class="student-row__value">${student.progress}%</span>
+                  <li data-inspect="class.student">
+                    <a class="student-row" href="#/student/${cls.id}/${index}">
+                      <span class="student-row__main">
+                        <span class="student-row__name">${esc(student.name)}</span>
+                        <span class="student-row__meta">Last active ${esc(student.lastActive)}</span>
+                        <span class="bar" aria-hidden="true"><span style="width:${student.progress}%"></span></span>
+                      </span>
+                      <span class="student-row__value">${student.progress}%</span>
+                      <span class="list-row__end">${ICONS.chevron}</span>
+                    </a>
                   </li>`;
               }).join("")}
             </ul>
@@ -4855,6 +4879,239 @@
               <p class="muted">Notes and question sets sent to this class will appear here.</p>
             </div>`) : ListStateBlock("shared work", "Nothing shared yet", "Notes and question sets sent to this class will appear here.")}
         </section>
+
+        <section class="flow--tight" data-inspect="class.questions">
+          <div class="section-head">
+            <h2 class="section-title">Question performance</h2>
+            <p class="muted">Open a question to see where the class lost marks</p>
+          </div>
+          ${trackedQuestions.length ? `
+            <ul class="list">
+              ${trackedQuestions.map(function (questionId) {
+                var question = questionById(questionId);
+                if (!question) return "";
+                var questionStats = classStats[questionId];
+                var foundQuestion = topicById(question.topicId);
+                return `
+                  <li data-inspect="class.questionRow">
+                    <a class="list-row list-row--question" href="#/insight/${cls.id}/${questionId}">
+                      <span class="list-row__main">
+                        <span class="list-row__title">${esc(truncate(question.stem, 78))}</span>
+                        <span class="list-row__meta">${esc(foundQuestion ? foundQuestion.topic.name : "")} · ${question.marks} marks · ${questionStats ? questionStats.attempts + " attempts" : "not attempted yet"}</span>
+                      </span>
+                      <span class="list-row__end">
+                        ${questionStats ? '<span class="badge">avg ' + questionStats.average.toFixed(1) + "/" + question.marks + "</span>" : '<span class="badge badge--panel">No data</span>'}
+                        ${ICONS.chevron}
+                      </span>
+                    </a>
+                  </li>`;
+              }).join("")}
+            </ul>` : `
+            <div class="empty">
+              <p class="empty__title">No question data yet</p>
+              <p class="muted">Share a question set and attempts will appear here.</p>
+            </div>`}
+        </section>
+      </div>`;
+  }
+
+  function QuestionInsightScreen(classId, questionId) {
+    var cls = classById(classId);
+    var question = questionById(questionId);
+    if (!cls || !question) return NotFoundScreen();
+
+    var found = topicById(question.topicId);
+    var topic = found ? found.topic : null;
+    var subject = found ? found.subject : subjectById(question.subjectId);
+    var stats = (CLASS_ATTEMPTS[classId] || {})[questionId] || null;
+    var students = CLASS_STUDENTS[classId] || [];
+    var missed = stats ? stats.missed : [];
+    var distribution = stats ? stats.distribution : [];
+    var peak = distribution.length ? Math.max.apply(null, distribution) : 0;
+
+    return `
+      <div class="screen screen--wide flow" data-inspect="insight.intro">
+        ${Breadcrumb([
+          { label: "Classes", route: "/classes" },
+          { label: cls.name, route: "/class/" + cls.id },
+          { label: "Question insight" }
+        ])}
+
+        <div class="page-head">
+          <p class="eyebrow">Teacher · Question insight</p>
+          <h1 class="page-title">${esc(topic ? topic.name : "Question")}</h1>
+          <p class="lede">${esc(cls.name)} · ${esc(subject ? subject.name : "")} · ${question.marks} marks</p>
+        </div>
+
+        <div class="stat-row" data-inspect="insight.stats">
+          <div class="stat">
+            <span class="stat__value">${stats ? stats.attempts : 0}</span>
+            <span class="stat__label">attempts</span>
+          </div>
+          <div class="stat">
+            <span class="stat__value">${stats ? stats.average.toFixed(1) : "—"}</span>
+            <span class="stat__label">average mark</span>
+          </div>
+          <div class="stat">
+            <span class="stat__value">${students.length}</span>
+            <span class="stat__label">students shown</span>
+          </div>
+        </div>
+
+        <section class="card card--plain">
+          <div class="badge-row">
+            <span class="badge ${question.kind === "practice" ? "badge--brand" : ""}">${question.kind === "practice" ? "Practice question" : "Past paper"}</span>
+            <span class="badge badge--panel">${question.marks} marks</span>
+            <span class="badge badge--panel">${esc(question.difficulty)}</span>
+          </div>
+          <p class="question-text">${esc(question.stem)}</p>
+          ${QuestionFigure(question)}
+        </section>
+
+        <section class="flow--tight" data-inspect="insight.markscheme">
+          <div class="section-head">
+            <h2 class="section-title">Where the class lost marks</h2>
+            <p class="muted">Share of attempts that missed each point</p>
+          </div>
+          <ul class="mark-list">
+            ${question.markScheme.map(function (point, index) {
+              var miss = null;
+              for (var i = 0; i < missed.length; i += 1) {
+                if (missed[i].index === index) miss = missed[i];
+              }
+              return `
+                <li class="mark-point">
+                  <span class="badge ${miss ? "badge--brand" : "badge--panel"}">${miss ? miss.percent + "% missed" : "Mostly met"}</span>
+                  <span class="mark-point__text">${esc(point.point)}</span>
+                </li>`;
+            }).join("")}
+          </ul>
+        </section>
+
+        ${stats ? `
+          <section class="flow--tight" data-inspect="insight.distribution">
+            <div class="section-head">
+              <h2 class="section-title">Mark distribution</h2>
+              <p class="muted">Attempts by mark, 0 to ${question.marks}</p>
+            </div>
+            <div class="dist">
+              ${distribution.map(function (count, mark) {
+                var height = peak ? Math.max(4, Math.round((count / peak) * 72)) : 4;
+                return `
+                  <div class="dist__bucket">
+                    <span class="dist__count">${count}</span>
+                    <span class="dist__bar" style="height:${height}px"></span>
+                    <span class="dist__label">${mark}</span>
+                  </div>`;
+              }).join("")}
+            </div>
+          </section>` : ""}
+
+        <div class="actions-row">
+          <a class="btn btn--primary" href="#/share">Share a question set</a>
+          <a class="btn btn--secondary" href="#/class/${cls.id}">Back to the class</a>
+        </div>
+      </div>`;
+  }
+
+  function StudentDetailScreen(classId, index) {
+    var cls = classById(classId);
+    var students = CLASS_STUDENTS[classId] || [];
+    var student = students[index];
+    if (!cls || !student) return NotFoundScreen();
+
+    var detail = STUDENT_DETAIL[classId + ":" + index] || null;
+    var attempts = detail ? detail.attempts : [];
+    var skills = detail ? detail.skills : [];
+    var awarded = attempts.reduce(function (total, attempt) { return total + attempt.awarded; }, 0);
+    var total = attempts.reduce(function (sum, attempt) { return sum + attempt.total; }, 0);
+    var weakest = skills.slice().sort(function (a, b) { return a.percent - b.percent; })[0];
+    var weakestTopic = weakest ? topicById(weakest.topicId) : null;
+
+    return `
+      <div class="screen screen--wide flow" data-inspect="student.intro">
+        ${Breadcrumb([
+          { label: "Classes", route: "/classes" },
+          { label: cls.name, route: "/class/" + cls.id },
+          { label: student.name }
+        ])}
+
+        <div class="page-head">
+          <p class="eyebrow">Teacher · Student</p>
+          <h1 class="page-title">${esc(student.name)}</h1>
+          <p class="lede">${esc(cls.name)} · last active ${esc(student.lastActive)}</p>
+        </div>
+
+        <div class="stat-row" data-inspect="student.stats">
+          <div class="stat">
+            <span class="stat__value">${student.progress}%</span>
+            <span class="stat__label">progress</span>
+          </div>
+          <div class="stat">
+            <span class="stat__value">${attempts.length}</span>
+            <span class="stat__label">attempts shown</span>
+          </div>
+          <div class="stat">
+            <span class="stat__value">${total ? Math.round((awarded / total) * 100) : 0}%</span>
+            <span class="stat__label">marks earned</span>
+          </div>
+        </div>
+
+        <section class="flow--tight" data-inspect="student.attempts">
+          <div class="section-head">
+            <h2 class="section-title">Recent attempts</h2>
+            <p class="muted">Newest first</p>
+          </div>
+          ${attempts.length ? `
+            <ul class="list">
+              ${attempts.map(function (attempt) {
+                var question = questionById(attempt.questionId);
+                var found = question ? topicById(question.topicId) : null;
+                return `
+                  <li>
+                    <div class="list-row" data-inspect="student.attempt">
+                      <span class="list-row__main">
+                        <span class="list-row__title">${esc(found ? found.topic.name : attempt.questionId)}</span>
+                        <span class="list-row__meta">${esc(question ? truncate(question.stem, 48) : "")} · ${formatDate(attempt.date)}</span>
+                      </span>
+                      <span class="list-row__end"><span class="badge">${attempt.awarded}/${attempt.total}</span></span>
+                    </div>
+                  </li>`;
+              }).join("")}
+            </ul>` : `
+            <div class="empty" data-inspect="state.empty">
+              <p class="empty__title">No attempts recorded yet</p>
+              <p class="muted">Detailed history is shown for a few students in this prototype.</p>
+            </div>`}
+        </section>
+
+        <section class="flow--tight" data-inspect="student.skills">
+          <div class="section-head">
+            <h2 class="section-title">Skill breakdown</h2>
+            <p class="muted">Marks per topic</p>
+          </div>
+          ${skills.length ? `
+            <ul class="mark-topic-list">
+              ${skills.map(function (skill) {
+                var foundSkill = topicById(skill.topicId);
+                return `
+                  <li class="mark-topic">
+                    <div class="mark-topic__head">
+                      <span class="mark-topic__name">${esc(foundSkill ? foundSkill.topic.name : skill.topicId)}</span>
+                      <span class="muted">${skill.percent}%</span>
+                    </div>
+                    <div class="bar" aria-hidden="true"><span style="width:${skill.percent}%"></span></div>
+                  </li>`;
+              }).join("")}
+            </ul>` : '<p class="muted">No topic marks recorded yet.</p>'}
+          ${weakest ? `
+            <p class="field__hint">Weakest topic: ${esc(weakestTopic ? weakestTopic.topic.name : weakest.topicId)} · ${weakest.percent}%.</p>` : ""}
+        </section>
+
+        <div class="actions-row">
+          <a class="btn btn--secondary" href="#/class/${cls.id}">Back to the class</a>
+          <a class="btn btn--ghost" href="#/share">Share something</a>
+        </div>
       </div>`;
   }
 
