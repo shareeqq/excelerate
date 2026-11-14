@@ -3232,6 +3232,26 @@ a.student-row:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Physics value checker ---------- */
+
+.calc {
+  padding: var(--space-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.calc__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.calc .actions-row {
+  margin-top: var(--space-3);
+}
+
 .chat-empty {
   display: flex;
   flex-direction: column;

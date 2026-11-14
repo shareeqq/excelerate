@@ -353,6 +353,7 @@
         scan: null,
         scanning: false,
         scanNotice: "",
+        calc: null,
         helpMessages: []
       };
     }
@@ -1014,6 +1015,38 @@
           refreshInspect();
         });
       });
+
+      var calcCheck = screen.querySelector("[data-calc-check]");
+      if (calcCheck) {
+        calcCheck.addEventListener("click", function () {
+          var question = questionById(activeQuestionId);
+          if (!question || !question.answers) return;
+          var valueInput = screen.querySelector("[data-calc-value]");
+          var unitInput = screen.querySelector("[data-calc-unit]");
+          var targetSelect = screen.querySelector("[data-calc-target]");
+          var error = screen.querySelector("[data-calc-error]");
+          var typed = valueInput ? valueInput.value.trim() : "";
+          var number = Number(typed.replace(/[^0-9eE+\-.]/g, ""));
+
+          if (!typed || isNaN(number)) {
+            if (error) error.hidden = false;
+            if (valueInput) valueInput.focus();
+            return;
+          }
+          if (error) error.hidden = true;
+
+          var target = question.answers[Number(targetSelect ? targetSelect.value : 0)] || question.answers[0];
+          saveDraft(activeQuestionId, {
+            calc: {
+              label: target.label,
+              lines: checkCalculation(number, typed, unitInput ? unitInput.value : "", target)
+            }
+          });
+          renderScreen();
+          wireScreen();
+          refreshInspect();
+        });
+      }
 
       var helpForm = screen.querySelector("[data-question-help-form]");
       if (helpForm) {
@@ -3218,8 +3251,9 @@
           </div>
         </form>
 
-        <section class="help-card" data-question-help data-inspect="question.help">
-          <div class="section-head">
+        ${PhysicsCalcPanel(question, draft)}
+
+        <section class="help-card" data-question-help data-inspect="question.help">          <div class="section-head">
             <h2 class="subsection-title">Question help</h2>
             <p class="muted">Sample replies</p>
           </div>
@@ -3345,6 +3379,94 @@
         <p class="field__hint">${question.kind === "practice"
           ? "Practice questions have not appeared in a past paper."
           : "Appearance counts are mock data for this prototype."}</p>
+      </section>`;
+  }
+
+  function normaliseUnit(unit) {
+    return String(unit || "")
+      .toLowerCase()
+      .replace(/\s+/g, "")
+      .replace(/⁻¹/g, "-1")
+      .replace(/⁻²/g, "-2")
+      .replace(/⁻³/g, "-3")
+      .replace(/¹/g, "1")
+      .replace(/²/g, "2")
+      .replace(/³/g, "3")
+      .replace(/\^/g, "")
+      .replace(/\*/g, "")
+      .replace(/·/g, "");
+  }
+
+  function significantFigures(text) {
+    var cleaned = String(text).trim().replace(/\s+/g, "").replace(/^[+-]/, "");
+    if (!/^\d*\.?\d+(e[+-]?\d+)?$/i.test(cleaned)) return null;
+    var mantissa = cleaned.split(/e/i)[0];
+    var digits = mantissa.replace(".", "").replace(/^0+/, "");
+    if (!digits) return 0;
+    if (mantissa.indexOf(".") === -1) digits = digits.replace(/0+$/, "");
+    return digits.length;
+  }
+
+  function checkCalculation(value, typed, unit, target) {
+    var lines = [];
+    var tolerance = Math.max(Math.abs(target.value) * 0.01, 0.001);
+    var valueOk = Math.abs(value - target.value) <= tolerance;
+    var unitOk = normaliseUnit(unit) === normaliseUnit(target.unit);
+    var figures = significantFigures(typed);
+    var figuresOk = figures === target.sigfigs;
+    var shown = target.value + " " + target.unit + " · " + target.sigfigs + " s.f.";
+
+    if (valueOk && unitOk && figuresOk) {
+      return ["Correct: " + shown + "."];
+    }
+    lines.push(valueOk ? "The value is right." : "The value is not within 1% of " + target.value + ". Check the substitution.");
+    if (!unitOk) {
+      lines.push(unit ? "The unit should be " + target.unit + " — you gave " + unit.trim() + "." : "The unit is missing; it should be " + target.unit + ".");
+    }
+    if (!figuresOk && figures !== null) {
+      lines.push("The mark scheme uses " + target.sigfigs + " significant figures; you gave " +
+        (figures === 0 ? "none" : figures) + ".");
+    }
+    lines.push("Model answer: " + shown + ".");
+    return lines;
+  }
+
+  function PhysicsCalcPanel(question, draft) {
+    if (!question.answers || !question.answers.length) return "";
+    return `
+      <section class="calc" data-inspect="question.calc">
+        <div class="section-head">
+          <h2 class="subsection-title">Check a value</h2>
+          <p class="muted">Value, unit and significant figures</p>
+        </div>
+        <div class="calc__row">
+          <div class="field">
+            <label class="field__label" for="calc-value-${question.id}">Your answer</label>
+            <input class="input" id="calc-value-${question.id}" type="text" inputmode="decimal" placeholder="e.g. 17.7" data-calc-value>
+          </div>
+          <div class="field">
+            <label class="field__label" for="calc-unit-${question.id}">Unit</label>
+            <input class="input" id="calc-unit-${question.id}" type="text" placeholder="e.g. m s⁻¹" data-calc-unit>
+          </div>
+          <div class="field">
+            <label class="field__label" for="calc-target-${question.id}">Which value</label>
+            <div class="select-wrap">
+              <select class="select" id="calc-target-${question.id}" data-calc-target>
+                ${question.answers.map(function (answer, index) {
+                  return '<option value="' + index + '">' + esc(answer.label) + "</option>";
+                }).join("")}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="actions-row">
+          <button type="button" class="btn btn--secondary btn--small" data-calc-check>Check</button>
+        </div>
+        <p class="field__error" data-calc-error hidden>Type a number to check.</p>
+        ${draft.calc ? `
+          <div class="scan-feedback" data-inspect="question.calcResult">
+            ${draft.calc.lines.map(function (line) { return "<p>" + esc(line) + "</p>"; }).join("")}
+          </div>` : ""}
       </section>`;
   }
 

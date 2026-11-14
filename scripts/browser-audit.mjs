@@ -938,6 +938,36 @@ check("a student without detail shows the empty state", async (api) => {
   await api.role("student");
 });
 
+check("the value checker validates value, unit and significant figures", async (api) => {
+  await api.goto("/question/phy-kin-1");
+  await api.client.evaluate(`(() => {
+    document.querySelector('[data-calc-value]').value = '17.7';
+    document.querySelector('[data-calc-unit]').value = 'm s-1';
+    document.querySelector('[data-calc-check]').click();
+  })()`);
+  await sleep(200);
+  let text = await api.client.evaluate("document.querySelector('#screen').innerText");
+  assert(/Correct:/.test(text), "a correct answer was not accepted: " + text.slice(0, 140));
+
+  await api.client.evaluate(`(() => {
+    document.querySelector('[data-calc-value]').value = '17.7';
+    document.querySelector('[data-calc-unit]').value = 'm';
+    document.querySelector('[data-calc-check]').click();
+  })()`);
+  await sleep(200);
+  text = await api.client.evaluate("document.querySelector('#screen').innerText");
+  assert(/unit should be/i.test(text), "the unit error was not reported");
+
+  await api.client.evaluate(`(() => {
+    document.querySelector('[data-calc-value]').value = '17.70';
+    document.querySelector('[data-calc-unit]').value = 'm s-1';
+    document.querySelector('[data-calc-check]').click();
+  })()`);
+  await sleep(200);
+  text = await api.client.evaluate("document.querySelector('#screen').innerText");
+  assert(/significant figures/i.test(text), "the significant-figure note was not shown");
+});
+
 const STUDENT_ROUTES = [
   "/", "/foundations", "/sitemap", "/login", "/topics", "/topics/cs", "/topics/physics",
   "/topic/phy-kinematics", "/topic/phy-kinematics/practice", "/topic/cs-databases",

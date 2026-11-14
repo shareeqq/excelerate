@@ -134,6 +134,10 @@ const QUESTIONS = [
       { point: "Uses s = ut + ½at²", earned: true },
       { point: "s = 15.9 m", earned: false }
     ],
+    answers: [
+      { label: "Speed", value: 17.7, unit: "m s⁻¹", sigfigs: 3 },
+      { label: "Height", value: 15.9, unit: "m", sigfigs: 3 }
+    ],
     feedback: "Your speed is correct. For the height, substitute u = 0 and a = 9.81 m s⁻² into s = ut + ½at², then check the unit.",
     workedSteps: [
       "Start with the quantities: u = 0, a = 9.81 m s⁻², t = 1.8 s.",
@@ -161,6 +165,10 @@ const QUESTIONS = [
       { point: "a = 1.3 m s⁻²", earned: true },
       { point: "Uses v = u + at", earned: true },
       { point: "t = 3.8 s", earned: true }
+    ],
+    answers: [
+      { label: "Acceleration", value: 1.3, unit: "m s⁻²", sigfigs: 2 },
+      { label: "Time", value: 3.8, unit: "s", sigfigs: 2 }
     ],
     feedback: "Both values follow from the same three quantities. Show the equation before substituting so the method mark is visible."
   },
@@ -212,6 +220,9 @@ const QUESTIONS = [
       { point: "Uses a = F / m", earned: true },
       { point: "a = 2.3 m s⁻²", earned: true }
     ],
+    answers: [
+      { label: "Acceleration", value: 2.3, unit: "m s⁻²", sigfigs: 2 }
+    ],
     feedback: "Subtract friction before dividing. The result is positive, so the crate accelerates in the direction of the pull."
   },
   {
@@ -233,6 +244,9 @@ const QUESTIONS = [
       { point: "Subtracts friction: 16.6 − 6.0 = 10.6 N", earned: true },
       { point: "Uses a = F / m", earned: true },
       { point: "a = 2.6 m s⁻²", earned: true }
+    ],
+    answers: [
+      { label: "Acceleration", value: 2.6, unit: "m s⁻²", sigfigs: 2 }
     ],
     feedback: "Resolve the weight on the slope first, subtract friction to get the resultant, then divide by the mass.",
     workedSteps: [
@@ -260,6 +274,9 @@ const QUESTIONS = [
     markScheme: [
       { point: "Uses E = ½kx²", earned: true },
       { point: "E = 1.3 J", earned: true }
+    ],
+    answers: [
+      { label: "Energy", value: 1.3, unit: "J", sigfigs: 2 }
     ],
     feedback: "Square the extension before multiplying. The unit is joules because the spring constant is in N m⁻¹."
   },
@@ -367,6 +384,9 @@ const QUESTIONS = [
       { point: "Uses 1/R = 1/18 + 1/36", earned: true },
       { point: "R = 12 Ω", earned: true },
       { point: "I = 1.0 A", earned: true }
+    ],
+    answers: [
+      { label: "Current", value: 1.0, unit: "A", sigfigs: 2 }
     ],
     feedback: "Find the combined resistance before using I = V / R. A quick check: the current is larger than through either resistor alone."
   },
@@ -2487,6 +2507,20 @@ const INSPECT_NOTES = {
     lines: [
       "Play, pause, step back and forward, scrub, or change the speed.",
       "Every step shows the reasoning for that line of working."
+    ]
+  },
+  "question.calc": {
+    title: "Check a value",
+    lines: [
+      "Compares your number with the mark scheme's answer, with the unit and significant figures.",
+      "The tolerance is one percent, matching how the paper rounds its answers."
+    ]
+  },
+  "question.calcResult": {
+    title: "Value check",
+    lines: [
+      "Says whether the value is inside the tolerance, and what to fix if it is not.",
+      "Units and significant figures are checked separately, as the mark scheme does."
     ]
   },
   "question.figure": {

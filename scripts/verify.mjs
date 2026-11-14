@@ -318,6 +318,97 @@ test("walkthroughs point at real questions and figures", () => {
   });
 });
 
+test("pseudocode runner supports the 9618 built-in functions", () => {
+  const program = [
+    'OUTPUT LEFT("ABCDEFGH", 3)',
+    'OUTPUT RIGHT("ABCDEFGH", 3)',
+    'OUTPUT MID("ABCDEFGH", 2, 3)',
+    'OUTPUT LENGTH("Happy Days")',
+    'OUTPUT TO_UPPER("Error 803")',
+    'OUTPUT TO_LOWER("JIM 803")',
+    'OUTPUT NUM_TO_STR(87.5)',
+    'OUTPUT STR_TO_NUM("23.45")',
+    'OUTPUT IS_NUM("-12.36")',
+    'OUTPUT IS_NUM("abc")',
+    'OUTPUT ASC("A")',
+    'OUTPUT CHR(66)',
+    'OUTPUT INT(27.5415)'
+  ].join("\n");
+  const result = Pseudo.run(program, "");
+  assert(result.ok, "built-ins failed: " + result.error);
+  const expected = ["ABC", "FGH", "BCD", "10", "ERROR 803", "jim 803", "87.5", "23.45", "TRUE", "FALSE", "65", "B", "27"];
+  assert(JSON.stringify(result.output) === JSON.stringify(expected),
+    "unexpected output: " + JSON.stringify(result.output));
+});
+
+test("pseudocode runner names the built-ins when a function is missing", () => {
+  const result = Pseudo.run('OUTPUT REVERSE("abc")', "");
+  assert(!result.ok, "expected an unknown-function error");
+  assert(/LEFT/.test(result.error), "the error should list the built-ins: " + result.error);
+});
+
+test("pseudocode runner handles CASE and OTHERWISE", () => {
+  const program = [
+    "DECLARE n : INTEGER",
+    "n <- 2",
+    "CASE OF n",
+    '    1 : OUTPUT "one"',
+    '    2 : OUTPUT "two"',
+    '    OTHERWISE OUTPUT "many"',
+    "ENDCASE",
+    "n <- 9",
+    "CASE OF n",
+    '    1 : OUTPUT "one"',
+    '    OTHERWISE OUTPUT "many"',
+    "ENDCASE"
+  ].join("\n");
+  const result = Pseudo.run(program, "");
+  assert(result.ok, "CASE failed: " + result.error);
+  assert(result.output.join(",") === "two,many", "unexpected output: " + result.output.join(","));
+});
+
+test("pseudocode runner handles records", () => {
+  const program = [
+    "TYPE Component",
+    "    DECLARE Item_Num : INTEGER",
+    "    DECLARE Reject : BOOLEAN",
+    "    DECLARE Stage : CHAR",
+    "ENDTYPE",
+    "DECLARE Items : ARRAY[1:3] OF Component",
+    'Items[1].Item_Num <- 123478',
+    'Items[1].Stage <- "B"',
+    "Items[2].Item_Num <- 7",
+    'OUTPUT Items[1].Item_Num, " ", Items[1].Stage',
+    "OUTPUT Items[2].Item_Num",
+    "OUTPUT Items[1].Reject"
+  ].join("\n");
+  const result = Pseudo.run(program, "");
+  assert(result.ok, "records failed: " + result.error + " (line " + result.line + ")");
+  assert(result.output.join("|") === "123478 B|7|FALSE", "unexpected output: " + result.output.join("|"));
+});
+
+test("pseudocode runner handles virtual files", () => {
+  const program = [
+    'OPEN "out.txt" FOR WRITE',
+    'WRITEFILE "out.txt", "line one"',
+    'WRITEFILE "out.txt", "line two"',
+    'CLOSEFILE "out.txt"',
+    'OPEN "out.txt" FOR READ',
+    'DECLARE line : STRING',
+    'DECLARE count : INTEGER',
+    "count <- 0",
+    'WHILE NOT EOF("out.txt")',
+    '    READFILE "out.txt", line',
+    "    count <- count + 1",
+    "    OUTPUT count, \": \", line",
+    "ENDWHILE",
+    'CLOSEFILE "out.txt"'
+  ].join("\n");
+  const result = Pseudo.run(program, "");
+  assert(result.ok, "files failed: " + result.error + " (line " + result.line + ")");
+  assert(result.output.join("|") === "1: line one|2: line two", "unexpected output: " + result.output.join("|"));
+});
+
 /* ---------- Runner ---------- */
 
 let failed = 0;

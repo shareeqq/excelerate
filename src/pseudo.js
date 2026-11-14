@@ -73,7 +73,7 @@ var Pseudo = (function () {
         index += 2;
         continue;
       }
-      if ("+-*/^&()[],:<>=".indexOf(character) !== -1) {
+      if ("+-*/^&()[],:<>.".indexOf(character) !== -1) {
         tokens.push({ type: "op", value: character });
         index += 1;
         continue;
@@ -221,42 +221,54 @@ var Pseudo = (function () {
 
   Parser.prototype.parsePrimary = function () {
     var token = this.next();
-    if (token.type === "number") return { type: "number", value: token.value };
-    if (token.type === "string") return { type: "string", value: token.value };
-    if (token.type === "word") {
+    var node;
+    if (token.type === "number") node = { type: "number", value: token.value };
+    else if (token.type === "string") node = { type: "string", value: token.value };
+    else if (token.type === "word") {
       var upper = token.value.toUpperCase();
-      if (upper === "TRUE") return { type: "boolean", value: true };
-      if (upper === "FALSE") return { type: "boolean", value: false };
-      var name = token.value.toLowerCase();
-      if (this.isOp("(")) {
-        this.next();
-        var args = [];
-        if (!this.isOp(")")) {
-          args.push(this.parseOr());
-          while (this.acceptOp(",")) args.push(this.parseOr());
+      if (upper === "TRUE") node = { type: "boolean", value: true };
+      else if (upper === "FALSE") node = { type: "boolean", value: false };
+      else {
+        var name = token.value.toLowerCase();
+        if (this.isOp("(")) {
+          this.next();
+          var args = [];
+          if (!this.isOp(")")) {
+            args.push(this.parseOr());
+            while (this.acceptOp(",")) args.push(this.parseOr());
+          }
+          this.expectOp(")");
+          node = { type: "call", name: name, args: args };
+        } else if (this.isOp("[")) {
+          this.next();
+          var first = this.parseOr();
+          if (this.acceptOp(",")) {
+            var second = this.parseOr();
+            this.expectOp("]");
+            node = { type: "index2", name: name, row: first, column: second };
+          } else {
+            this.expectOp("]");
+            node = { type: "index", name: name, index: first };
+          }
+        } else {
+          node = { type: "name", name: name };
         }
-        this.expectOp(")");
-        return { type: "call", name: name, args: args };
       }
-      if (this.isOp("[")) {
-        this.next();
-        var first = this.parseOr();
-        if (this.acceptOp(",")) {
-          var second = this.parseOr();
-          this.expectOp("]");
-          return { type: "index2", name: name, row: first, column: second };
-        }
-        this.expectOp("]");
-        return { type: "index", name: name, index: first };
-      }
-      return { type: "name", name: name };
-    }
-    if (token.type === "op" && token.value === "(") {
-      var inner = this.parseOr();
+    } else if (token.type === "op" && token.value === "(") {
+      node = this.parseOr();
       this.expectOp(")");
-      return inner;
+    } else {
+      throw { message: "Unexpected " + (token.value === undefined ? token.type : token.value) };
     }
-    throw { message: "Unexpected " + (token.value === undefined ? token.type : token.value) };
+
+    while (this.isOp(".")) {
+      this.next();
+      var field = this.next();
+      if (field.type !== "word") throw { message: "Expected a field name after ." };
+      node = { type: "field", object: node, name: field.value.toLowerCase() };
+    }
+
+    return node;
   };
 
   /* ---------- Line helpers ---------- */
@@ -377,6 +389,48 @@ var Pseudo = (function () {
     return parts;
   }
 
+  /* ---------- Statements on one line (CASE branches) ---------- */
+
+  function parseInlineStatement(text, line) {
+    var trimmed = String(text).trim();
+    var wordMatch = trimmed.match(/^([A-Za-z]+)/);
+    var word = wordMatch ? wordMatch[1].toUpperCase() : "";
+
+    if (word === "OUTPUT" || word === "PRINT" || word === "WRITE") {
+      return {
+        type: "output",
+        values: splitArguments(trimmed.slice(word.length).trim()).map(parseExpression),
+        line: line
+      };
+    }
+
+    if (word === "CALL") {
+      var callMatch = trimmed.slice(4).trim().match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(?:\((.*)\))?$/);
+      if (!callMatch) throw { message: "CALL needs a procedure name", line: line };
+      return {
+        type: "call",
+        name: callMatch[1].toLowerCase(),
+        args: callMatch[2] ? splitArguments(callMatch[2]).map(parseExpression) : [],
+        line: line
+      };
+    }
+
+    var arrow = trimmed.indexOf("<-");
+    if (arrow !== -1) {
+      var targetText = trimmed.slice(0, arrow).trim();
+      var valueText = trimmed.slice(arrow + 2).trim();
+      return { type: "assign", target: parseTarget(targetText, line), value: parseExpression(valueText), line: line };
+    }
+
+    throw { message: "A CASE branch can OUTPUT, CALL or assign", line: line };
+  }
+
+  function parseTarget(text, line) {
+    var node = parseExpression(text);
+    if (node.type === "name" || node.type === "index" || node.type === "field") return node;
+    throw { message: "Cannot store a value in " + text, line: line };
+  }
+
   /* ---------- Statement parser ---------- */
 
   function Program(source) {
@@ -460,6 +514,40 @@ var Pseudo = (function () {
       };
     }
 
+    if (word === "CASE") {
+      var caseMatch = text.match(/^CASE\s+OF\s+(.+)$/i);
+      if (!caseMatch) throw { message: "CASE needs: CASE OF value", line: line };
+      this.position += 1;
+      var branches = [];
+      var otherwise = null;
+      while (this.position < this.lines.length && this.firstWord() !== "ENDCASE") {
+        var branchEntry = this.lines[this.position];
+        var branchText = branchEntry.text;
+        if (/^OTHERWISE\b/i.test(branchText)) {
+          otherwise = parseInlineStatement(branchText.replace(/^OTHERWISE\s*/i, ""), branchEntry.line);
+          this.position += 1;
+          continue;
+        }
+        var colon = topLevelIndex(branchText, ":");
+        if (colon === -1) {
+          throw { message: "CASE branches look like: 1 : OUTPUT \"one\"", line: branchEntry.line };
+        }
+        branches.push({
+          match: parseExpression(branchText.slice(0, colon)),
+          statement: parseInlineStatement(branchText.slice(colon + 1), branchEntry.line)
+        });
+        this.position += 1;
+      }
+      this.expectWord("ENDCASE", line);
+      return {
+        type: "case",
+        selector: parseExpression(caseMatch[1]),
+        branches: branches,
+        otherwise: otherwise,
+        line: line
+      };
+    }
+
     if (word === "WHILE") {
       var conditionWhile = text.replace(/^WHILE\s+/i, "").replace(/\s+DO\s*$/i, "");
       this.position += 1;
@@ -495,6 +583,68 @@ var Pseudo = (function () {
         body: routineBody,
         line: line
       };
+    }
+
+    if (word === "TYPE") {
+      var typeName = rest.trim().toLowerCase();
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(typeName)) {
+        throw { message: "TYPE needs a name", line: line };
+      }
+      this.position += 1;
+      var typeFields = [];
+      while (this.position < this.lines.length && this.firstWord() !== "ENDTYPE") {
+        var fieldEntry = this.lines[this.position];
+        var fieldMatch = fieldEntry.text.match(/^DECLARE\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z]+)$/i);
+        if (!fieldMatch) {
+          throw { message: "TYPE fields look like: DECLARE Name : INTEGER", line: fieldEntry.line };
+        }
+        typeFields.push({ name: fieldMatch[1].toLowerCase(), type: fieldMatch[2].toUpperCase() });
+        this.position += 1;
+      }
+      this.expectWord("ENDTYPE", line);
+      return { type: "type", name: typeName, fields: typeFields, line: line };
+    }
+
+    if (word === "OPEN") {
+      var openMatch = text.match(/^OPEN\s+(.+?)\s+FOR\s+(READ|WRITE|APPEND)\s*$/i);
+      if (!openMatch) throw { message: "OPEN looks like: OPEN F1 FOR READ", line: line };
+      this.position += 1;
+      return {
+        type: "open",
+        file: parseExpression(openMatch[1]),
+        mode: openMatch[2].toUpperCase(),
+        line: line
+      };
+    }
+
+    if (word === "READFILE" || word === "WRITEFILE") {
+      var closeMatch = text.match(/^(READFILE|WRITEFILE)\s+(.+)$/i);
+      if (!closeMatch) throw { message: word + " needs a file and a value", line: line };
+      var callParts = splitArguments(closeMatch[2]);
+      if (callParts.length < 2) {
+        throw { message: word + " looks like: " + word + " F1, Line", line: line };
+      }
+      this.position += 1;
+      if (word === "READFILE") {
+        return {
+          type: "readfile",
+          file: parseExpression(callParts[0]),
+          target: parseTarget(callParts.slice(1).join(","), line),
+          line: line
+        };
+      }
+      return {
+        type: "writefile",
+        file: parseExpression(callParts[0]),
+        value: parseExpression(callParts.slice(1).join(",")),
+        line: line
+      };
+    }
+
+    if (word === "CLOSEFILE") {
+      if (!rest.trim()) throw { message: "CLOSEFILE needs a file", line: line };
+      this.position += 1;
+      return { type: "closefile", file: parseExpression(rest), line: line };
     }
 
     if (word === "CALL") {
@@ -618,15 +768,106 @@ var Pseudo = (function () {
     return Boolean(value);
   }
 
-  function emptyArray(bounds, elementType) {
+  /* ---------- Built-in functions ---------- */
+
+  function toText(value, name) {
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") return formatValue(value);
+    throw { message: name + " needs a string or character" };
+  }
+
+  function toCount(value, name) {
+    var number = toNumber(value, name);
+    if (!Number.isInteger(number)) throw { message: name + " needs a whole number" };
+    if (number < 0) throw { message: name + " needs a count of zero or more" };
+    return number;
+  }
+
+  var BUILTINS = {
+    left: function (args) {
+      var text = toText(args[0], "LEFT");
+      return text.slice(0, toCount(args[1], "LEFT"));
+    },
+    right: function (args) {
+      var text = toText(args[0], "RIGHT");
+      var count = toCount(args[1], "RIGHT");
+      if (count === 0) return "";
+      return text.slice(Math.max(0, text.length - count));
+    },
+    mid: function (args) {
+      var text = toText(args[0], "MID");
+      var start = toCount(args[1], "MID");
+      var count = toCount(args[2], "MID");
+      return text.substr(Math.max(0, start - 1), count);
+    },
+    length: function (args) {
+      return toText(args[0], "LENGTH").length;
+    },
+    to_upper: function (args) {
+      return toText(args[0], "TO_UPPER").toUpperCase();
+    },
+    to_lower: function (args) {
+      return toText(args[0], "TO_LOWER").toLowerCase();
+    },
+    num_to_str: function (args) {
+      return formatValue(args[0]);
+    },
+    str_to_num: function (args) {
+      var text = toText(args[0], "STR_TO_NUM").trim();
+      var value = Number(text);
+      if (text === "" || isNaN(value)) {
+        throw { message: "STR_TO_NUM could not read " + text };
+      }
+      return value;
+    },
+    is_num: function (args) {
+      var text = toText(args[0], "IS_NUM").trim();
+      return text !== "" && !isNaN(Number(text));
+    },
+    asc: function (args) {
+      var text = toText(args[0], "ASC");
+      if (!text.length) throw { message: "ASC needs a character" };
+      return text.charCodeAt(0);
+    },
+    chr: function (args) {
+      return String.fromCharCode(toNumber(args[0], "CHR"));
+    },
+    int: function (args) {
+      return Math.trunc(toNumber(args[0], "INT"));
+    },
+    rand: function (args) {
+      return Math.random() * toNumber(args[0], "RAND");
+    },
+    eof: function (args, runtime) {
+      var name = formatValue(args[0]);
+      var file = runtime.files[name];
+      return !file || file.cursor >= file.lines.length;
+    }
+  };
+
+  function emptyArray(bounds, elementType, runtime) {
     var range = parseBounds(bounds);
+    var typeName = String(elementType || "").toLowerCase();
+    var definition = runtime && runtime.types ? runtime.types[typeName] : null;
     var array = [];
     for (var i = range.lower; i <= range.upper; i += 1) {
-      array[i] = elementType === "STRING" ? "" : elementType === "BOOLEAN" ? false : 0;
+      array[i] = definition
+        ? makeRecord(definition)
+        : elementType === "STRING" || elementType === "CHAR" ? "" : elementType === "BOOLEAN" ? false : 0;
     }
     array.lower = range.lower;
     array.upper = range.upper;
     return array;
+  }
+
+  function makeRecord(definition) {
+    var record = {};
+    definition.fields.forEach(function (field) {
+      record[field.name] = field.type === "STRING" || field.type === "CHAR"
+        ? ""
+        : field.type === "BOOLEAN" ? false : 0;
+    });
+    return record;
   }
 
   function parseBounds(bounds) {
@@ -653,6 +894,8 @@ var Pseudo = (function () {
     this.depth = 0;
     this.line = 0;
     this.routines = Object.create(null);
+    this.types = Object.create(null);
+    this.files = Object.create(null);
   }
 
   Runtime.prototype.scope = function () {
@@ -717,9 +960,28 @@ var Pseudo = (function () {
         if (!Array.isArray(row)) throw { message: node.name + " is not a 2D array", line: this.line };
         return row[getIndex(this, node.column, row)];
       }
+      case "field": {
+        var record = this.evaluate(node.object);
+        if (!record || typeof record !== "object" || Array.isArray(record)) {
+          throw { message: "That value has no field " + node.name, line: this.line };
+        }
+        if (!(node.name in record)) {
+          throw { message: "This record has no field " + node.name, line: this.line };
+        }
+        return record[node.name];
+      }
       case "call": {
+        if (BUILTINS[node.name]) {
+          return BUILTINS[node.name](node.args.map(this.evaluate, this), this);
+        }
         var routine = this.routines[node.name];
-        if (!routine) throw { message: "Unknown function " + node.name, line: this.line };
+        if (!routine) {
+          throw {
+            message: "Unknown function " + node.name.toUpperCase() + ". Built-ins: " +
+              Object.keys(BUILTINS).map(function (name) { return name.toUpperCase(); }).join(", "),
+            line: this.line
+          };
+        }
         if (routine.kind !== "FUNCTION") throw { message: node.name + " is a procedure, so use CALL", line: this.line };
         var args = node.args.map(this.evaluate, this);
         return this.invoke(routine, args);
@@ -839,11 +1101,15 @@ var Pseudo = (function () {
       case "declare": {
         for (var declared = 0; declared < statement.names.length; declared += 1) {
           var entry = statement.names[declared];
+          var typeName = String(statement.elementType || "").toLowerCase();
+          var definition = this.types[typeName];
           var value;
           if (statement.initial) {
             value = this.evaluate(statement.initial);
           } else if (entry.bounds) {
-            value = emptyArray(entry.bounds, statement.elementType);
+            value = emptyArray(entry.bounds, statement.elementType, this);
+          } else if (definition) {
+            value = makeRecord(definition);
           } else if (statement.elementType === "STRING" || statement.elementType === "CHAR") {
             value = "";
           } else if (statement.elementType === "BOOLEAN") {
@@ -879,6 +1145,16 @@ var Pseudo = (function () {
       case "if": {
         if (toBoolean(this.evaluate(statement.test))) return this.run(statement.then);
         return this.run(statement.otherwise);
+      }
+      case "case": {
+        var subject = this.evaluate(statement.selector);
+        for (var branch = 0; branch < statement.branches.length; branch += 1) {
+          if (compareValues(subject, this.evaluate(statement.branches[branch].match)) === 0) {
+            return this.run([statement.branches[branch].statement]);
+          }
+        }
+        if (statement.otherwise) return this.run([statement.otherwise]);
+        return null;
       }
       case "for": {
         var from = toNumber(this.evaluate(statement.from), "The start of FOR");
@@ -925,6 +1201,45 @@ var Pseudo = (function () {
       case "routine":
         this.routines[statement.name] = statement;
         return null;
+      case "type":
+        this.types[statement.name] = { fields: statement.fields };
+        return null;
+      case "open": {
+        var openName = formatValue(this.evaluate(statement.file));
+        if (!this.files[openName]) this.files[openName] = { lines: [], cursor: 0, mode: "" };
+        if (statement.mode === "WRITE") this.files[openName].lines = [];
+        this.files[openName].cursor = 0;
+        this.files[openName].mode = statement.mode;
+        return null;
+      }
+      case "readfile": {
+        var readName = formatValue(this.evaluate(statement.file));
+        var readFile = this.files[readName];
+        if (!readFile || readFile.mode !== "READ") {
+          throw { message: "Open " + readName + " FOR READ before reading it", line: this.line };
+        }
+        if (readFile.cursor >= readFile.lines.length) {
+          throw { message: "There are no more lines in " + readName, line: this.line };
+        }
+        this.store(statement.target, readFile.lines[readFile.cursor]);
+        readFile.cursor += 1;
+        return null;
+      }
+      case "writefile": {
+        var writeName = formatValue(this.evaluate(statement.file));
+        if (!this.files[writeName]) this.files[writeName] = { lines: [], cursor: 0, mode: "WRITE" };
+        var writeFile = this.files[writeName];
+        if (writeFile.mode !== "WRITE" && writeFile.mode !== "APPEND") {
+          throw { message: "Open " + writeName + " FOR WRITE or APPEND before writing to it", line: this.line };
+        }
+        writeFile.lines.push(formatValue(this.evaluate(statement.value)));
+        return null;
+      }
+      case "closefile": {
+        var closeName = formatValue(this.evaluate(statement.file));
+        if (this.files[closeName]) this.files[closeName].mode = "";
+        return null;
+      }
       case "call": {
         var target = this.routines[statement.name];
         if (!target) throw { message: "Unknown procedure " + statement.name, line: this.line };
@@ -952,6 +1267,14 @@ var Pseudo = (function () {
       array[getIndex(this, target.index, array)] = value;
       return;
     }
+    if (target.type === "field") {
+      var record = this.evaluate(target.object);
+      if (!record || typeof record !== "object" || Array.isArray(record)) {
+        throw { message: "That value has no field " + target.name, line: this.line };
+      }
+      record[target.name] = value;
+      return;
+    }
     throw { message: "Cannot store a value here", line: this.line };
   };
 
@@ -965,16 +1288,7 @@ var Pseudo = (function () {
     }
     var targetText = parts.shift().trim();
     var valueText = parts.join("<-").trim();
-    var targetTokens = tokenize(targetText);
-    var target;
-    if (targetTokens.length === 1 && targetTokens[0].type === "word") {
-      target = { type: "name", name: targetTokens[0].value.toLowerCase() };
-    } else if (targetTokens.length > 1 && targetTokens[0].type === "word" && targetTokens[1].value === "[") {
-      var inner = targetText.slice(targetText.indexOf("[") + 1, targetText.lastIndexOf("]"));
-      target = { type: "index", name: targetTokens[0].value.toLowerCase(), index: parseExpression(inner) };
-    } else {
-      throw { message: "Cannot store a value in " + targetText, line: entry.line };
-    }
+    var target = parseTarget(targetText, entry.line);
     this.position += 1;
     return { type: "assign", target: target, value: parseExpression(valueText), line: entry.line };
   };
@@ -983,7 +1297,8 @@ var Pseudo = (function () {
   var baseParseStatement = Program.prototype.parseStatement;
   Program.prototype.parseStatement = function () {
     var entry = this.lines[this.position];
-    if (entry && entry.text.indexOf("<-") !== -1 && /^[A-Za-z_][A-Za-z0-9_]*(\s*\[[^\]]*\])?\s*<-/.test(entry.text)) {
+    if (entry && entry.text.indexOf("<-") !== -1 &&
+      /^[A-Za-z_][A-Za-z0-9_]*(?:\s*\[[^\]]*\])*(?:\s*\.\s*[A-Za-z_][A-Za-z0-9_]*)*\s*<-/.test(entry.text)) {
       return this.parseAssignment();
     }
     return baseParseStatement.call(this);
@@ -1068,6 +1383,9 @@ var Pseudo = (function () {
           collectNames(argument, out);
         });
         return;
+      case "field":
+        collectNames(node.object, out);
+        return;
       default:
         return;
     }
@@ -1096,7 +1414,7 @@ var Pseudo = (function () {
     statements.forEach(function (statement) {
       switch (statement.type) {
         case "assign":
-          out.push(statement.target.name);
+          if (statement.target.type !== "field") out.push(statement.target.name);
           break;
         case "input":
           statement.targets.forEach(function (target) {
@@ -1107,6 +1425,12 @@ var Pseudo = (function () {
         case "if":
           assignedNames(statement.then, out);
           assignedNames(statement.otherwise, out);
+          break;
+        case "case":
+          statement.branches.forEach(function (branch) {
+            assignedNames([branch.statement], out);
+          });
+          if (statement.otherwise) assignedNames([statement.otherwise], out);
           break;
         case "for":
         case "while":
@@ -1150,7 +1474,11 @@ var Pseudo = (function () {
           });
           break;
         case "assign":
-          facts.assigns.push(statement.target.name);
+          if (statement.target.type === "field") {
+            collectNames(statement.target.object, facts.reads);
+          } else {
+            facts.assigns.push(statement.target.name);
+          }
           var selfNames = [];
           collectNames(statement.value, selfNames);
           if (selfNames.indexOf(statement.target.name) !== -1 &&
@@ -1171,6 +1499,25 @@ var Pseudo = (function () {
           collectNames(statement.test, facts.reads);
           collectFacts(statement.then, facts);
           collectFacts(statement.otherwise, facts);
+          break;
+        case "case":
+          collectNames(statement.selector, facts.reads);
+          statement.branches.forEach(function (branch) {
+            collectNames(branch.match, facts.reads);
+            collectFacts([branch.statement], facts);
+          });
+          if (statement.otherwise) collectFacts([statement.otherwise], facts);
+          break;
+        case "open":
+        case "closefile":
+          collectNames(statement.file, facts.reads);
+          break;
+        case "readfile":
+          collectNames(statement.file, facts.reads);
+          break;
+        case "writefile":
+          collectNames(statement.file, facts.reads);
+          collectNames(statement.value, facts.reads);
           break;
         case "for":
           var from = literalNumber(statement.from);
