@@ -20,6 +20,7 @@ const dataCode = read("src/data.js") + `
   COMMUNITY_POSTS: COMMUNITY_POSTS,
   ASSISTANT_PROMPTS: ASSISTANT_PROMPTS,
   FIGURES: typeof FIGURES === "undefined" ? {} : FIGURES,
+  WALKTHROUGHS: typeof WALKTHROUGHS === "undefined" ? {} : WALKTHROUGHS,
   CODE_WORKSPACES: typeof CODE_WORKSPACES === "undefined" ? {} : CODE_WORKSPACES,
   SCREENS: SCREENS,
   INSPECT_NOTES: INSPECT_NOTES
@@ -39,6 +40,11 @@ const figuresContext = { console };
 vm.createContext(figuresContext);
 vm.runInContext(read("src/figures.js"), figuresContext);
 const Figures = figuresContext.Figures;
+
+const inkContext = { console };
+vm.createContext(inkContext);
+vm.runInContext(read("src/ink.js"), inkContext);
+const Ink = inkContext.Ink;
 
 const app = read("src/app.js");
 const css = read("src/styles.css");
@@ -212,6 +218,7 @@ test("build is self-contained", () => {
   assert(!build.includes("src/styles.css"), "external CSS reference");
   assert(!build.includes("src/pseudo.js"), "external runner reference");
   assert(!build.includes("src/figures.js"), "external figures reference");
+  assert(!build.includes("src/ink.js"), "external ink reference");
   assert(!build.includes("src/data.js"), "external data reference");
   assert(!build.includes("src/app.js"), "external app reference");
   assert(build.includes("var Pseudo = "), "the pseudocode runner was not inlined");
@@ -281,6 +288,34 @@ test("pseudocode review flags common mistakes", () => {
   const broken = Pseudo.analyse("IF x > 1 THEN\nOUTPUT 1");
   assert(!broken.ok, "an unclosed IF should fail");
   assert(broken.line === 1, "expected line 1, got " + broken.line);
+});
+
+test("ink renders deterministic annotations", () => {
+  const marks = [
+    { type: "underline", x1: 10, y1: 20, x2: 120, y2: 22 },
+    { type: "circle", cx: 60, cy: 60, rx: 30, ry: 20, style: "accent" },
+    { type: "arrow", x1: 10, y1: 10, x2: 80, y2: 40 }
+  ];
+  const first = Ink.render(marks, 360, 200);
+  const second = Ink.render(marks, 360, 200);
+  assert(first === second, "ink is not deterministic between renders");
+  assert(first.indexOf("<svg") === 0, "ink did not render an SVG");
+  assert((first.match(/<path/g) || []).length === 3, "expected three strokes");
+  assert(first.indexOf('viewBox="0 0 360 200"') !== -1, "wrong viewBox");
+});
+
+test("walkthroughs point at real questions and figures", () => {
+  const ids = Object.keys(data.WALKTHROUGHS);
+  assert(ids.length >= 2, "expected at least two walkthroughs");
+  ids.forEach((id) => {
+    assert(data.QUESTIONS.some((question) => question.id === id), "walkthrough for unknown question " + id);
+    assert(data.FIGURES[id], "walkthrough " + id + " has no figure to draw on");
+    const steps = data.WALKTHROUGHS[id].steps;
+    assert(steps.length >= 2, "walkthrough " + id + " has too few steps");
+    steps.forEach((step) => {
+      assert(step.caption && step.marks && step.marks.length, "a step in " + id + " is incomplete");
+    });
+  });
 });
 
 /* ---------- Runner ---------- */

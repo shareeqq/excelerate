@@ -111,6 +111,35 @@
   state.solutionQuestionId = null;
   state.codeDrafts = {};
   state.codePrefill = null;
+  state.walkthrough = null;
+  var walkTimer = null;
+
+  function stopWalkthrough() {
+    if (walkTimer) {
+      clearTimeout(walkTimer);
+      walkTimer = null;
+    }
+  }
+
+  function scheduleWalkthrough() {
+    stopWalkthrough();
+    var walk = state.walkthrough;
+    if (!walk || !walk.playing) return;
+    var total = (WALKTHROUGHS[walk.id] || { steps: [] }).steps.length;
+    walkTimer = setTimeout(function () {
+      if (!state.walkthrough || !state.walkthrough.playing) return;
+      if (state.walkthrough.step >= total - 1) {
+        state.walkthrough.playing = false;
+        renderScreen();
+        wireScreen();
+        return;
+      }
+      state.walkthrough.step += 1;
+      renderScreen();
+      wireScreen();
+      scheduleWalkthrough();
+    }, 2700 / (walk.speed || 1));
+  }
 
   var inspectedEl = null;
   var pinned = false;
@@ -194,6 +223,7 @@
       if (questionParts[1] === "solutions") return { name: "question", id: questionParts[0], tab: "solutions" };
       if (questionParts[1] === "discussion") return { name: "question", id: questionParts[0], tab: "discussion" };
       if (questionParts[1] === "stats") return { name: "question", id: questionParts[0], tab: "stats" };
+      if (questionParts[1] === "walkthrough") return { name: "walkthrough", id: questionParts[0] };
       return { name: "question", id: questionParts[0], tab: "solve" };
     }
     if (route.indexOf("/result/") === 0) return { name: "result", id: route.slice(8) };
@@ -626,6 +656,11 @@
         screen.innerHTML = TopicScreen(detail.id, detail.tab);
       } else if (detail.name === "question") {
         screen.innerHTML = QuestionScreen(detail.id, detail.tab);
+      } else if (detail.name === "walkthrough") {
+        if (!state.walkthrough || state.walkthrough.id !== detail.id) {
+          state.walkthrough = { id: detail.id, step: 0, playing: false, speed: 1 };
+        }
+        screen.innerHTML = WalkthroughScreen(detail.id);
       } else if (detail.name === "solution") {
         screen.innerHTML = SolutionDetailScreen(detail.questionId, detail.solutionId);
       } else if (detail.name === "review") {
@@ -677,6 +712,8 @@
   function render() {
     var openLayer = document.querySelector(".modal-layer:not([hidden])");
     if (openLayer) closeModal(openLayer);
+
+    if (state.route.indexOf("/walkthrough") === -1) stopWalkthrough();
 
     applyLayout();
     renderTopbar();
@@ -1430,6 +1467,69 @@
             openInfoModal("Full solution",
               '<p class="muted">' + esc(post.author) + " · " + esc(post.time) + "</p><p>" + esc(post.solution) + "</p>");
           });
+        });
+      }
+    }
+
+    var player = screen.querySelector("[data-player]");
+    if (player && state.walkthrough) {
+      var walkTotal = (WALKTHROUGHS[state.walkthrough.id] || { steps: [] }).steps.length;
+
+      var goToStep = function (value) {
+        state.walkthrough.step = Math.max(0, Math.min(value, walkTotal - 1));
+      };
+
+      var togglePlayer = player.querySelector("[data-player-toggle]");
+      if (togglePlayer) {
+        togglePlayer.addEventListener("click", function () {
+          if (!state.walkthrough.playing && state.walkthrough.step >= walkTotal - 1) {
+            state.walkthrough.step = 0;
+          }
+          state.walkthrough.playing = !state.walkthrough.playing;
+          renderScreen();
+          wireScreen();
+          scheduleWalkthrough();
+        });
+      }
+
+      var previousStep = player.querySelector("[data-player-prev]");
+      if (previousStep) {
+        previousStep.addEventListener("click", function () {
+          state.walkthrough.playing = false;
+          stopWalkthrough();
+          goToStep(state.walkthrough.step - 1);
+          renderScreen();
+          wireScreen();
+        });
+      }
+
+      var nextStep = player.querySelector("[data-player-next]");
+      if (nextStep) {
+        nextStep.addEventListener("click", function () {
+          state.walkthrough.playing = false;
+          stopWalkthrough();
+          goToStep(state.walkthrough.step + 1);
+          renderScreen();
+          wireScreen();
+        });
+      }
+
+      var scrubStep = player.querySelector("[data-player-scrub]");
+      if (scrubStep) {
+        scrubStep.addEventListener("input", function () {
+          state.walkthrough.playing = false;
+          stopWalkthrough();
+          goToStep(Number(scrubStep.value));
+          renderScreen();
+          wireScreen();
+        });
+      }
+
+      var playerSpeed = player.querySelector("[data-player-speed]");
+      if (playerSpeed) {
+        playerSpeed.addEventListener("change", function () {
+          state.walkthrough.speed = Number(playerSpeed.value);
+          if (state.walkthrough.playing) scheduleWalkthrough();
         });
       }
     }
@@ -2903,6 +3003,72 @@
       "</nav>";
   }
 
+  function WalkthroughScreen(id) {
+    var question = questionById(id);
+    var walkthrough = WALKTHROUGHS[id];
+    if (!question || !walkthrough) return NotFoundScreen();
+
+    var found = topicById(question.topicId);
+    var topic = found ? found.topic : null;
+    var subject = found ? found.subject : subjectById(question.subjectId);
+    var spec = FIGURES[id];
+    var size = spec ? Figures.measure(spec) : { width: 360, height: 200 };
+    var walk = state.walkthrough || { id: id, step: 0, playing: false, speed: 1 };
+    var maxStep = walkthrough.steps.length - 1;
+    var step = Math.max(0, Math.min(walk.step, maxStep));
+    var marks = [];
+    walkthrough.steps.slice(0, step + 1).forEach(function (entry) {
+      marks = marks.concat(entry.marks || []);
+    });
+
+    return `
+      <div class="screen flow">
+        ${Breadcrumb([
+          { label: subject ? subject.name : "Subject", route: "/topics/" + question.subjectId },
+          { label: topic ? topic.name : "Topic", route: "/topic/" + question.topicId },
+          { label: "Question", route: "/question/" + question.id },
+          { label: "Walkthrough" }
+        ])}
+
+        <div class="page-head">
+          <p class="eyebrow">Walkthrough · ${esc(walkthrough.title)}</p>
+          <h1 class="page-title">Walk me through it</h1>
+          <p class="lede">Press play and the working is drawn on the question, one step at a time.</p>
+        </div>
+
+        <section class="card card--plain question-card">
+          <p class="question-text">${esc(question.stem)}</p>
+          ${spec ? `
+            <div class="walkthrough-stage" data-inspect="question.walkthrough">
+              ${Figures.render(spec)}
+              <div class="ink-layer">${Ink.render(marks, size.width, size.height)}</div>
+            </div>` : ""}
+        </section>
+
+        <section class="player" data-player data-inspect="question.player">
+          <div class="player__bar">
+            <button type="button" class="btn btn--secondary btn--small" data-player-prev>Back</button>
+            <button type="button" class="btn btn--primary btn--small" data-player-toggle>${walk.playing ? "Pause" : "Play"}</button>
+            <button type="button" class="btn btn--secondary btn--small" data-player-next>Next</button>
+            <input class="player__scrub" type="range" min="0" max="${maxStep}" value="${step}" step="1" data-player-scrub aria-label="Walkthrough step">
+            <span class="player__count">${step + 1} / ${walkthrough.steps.length}</span>
+            <div class="select-wrap select-wrap--compact">
+              <select class="select select--compact" data-player-speed aria-label="Playback speed">
+                ${[0.5, 1, 2].map(function (speed) {
+                  return '<option value="' + speed + '"' + (walk.speed === speed ? " selected" : "") + ">" + speed + "×</option>";
+                }).join("")}
+              </select>
+            </div>
+          </div>
+          <p class="player__caption">${esc(walkthrough.steps[step].caption)}</p>
+        </section>
+
+        <div class="actions-row">
+          <a class="btn btn--secondary" href="#/question/${question.id}">Back to the question</a>
+        </div>
+      </div>`;
+  }
+
   function ScanChecking() {
     return `
       <div class="scan-result scan-result--busy" data-inspect="question.scanChecking" aria-busy="true">
@@ -3035,6 +3201,7 @@
           <div class="actions-row" data-inspect="question.actions">
             <button type="submit" class="btn btn--primary">Submit answer</button>
             <button type="button" class="btn btn--secondary" data-open-modal="demoModal" data-inspect="question.save">Save for later</button>
+            ${WALKTHROUGHS[question.id] ? '<a class="btn btn--secondary" href="#/question/' + question.id + '/walkthrough" data-inspect="question.walkthrough">Walkthrough</a>' : ""}
             <a class="btn btn--ghost" href="#/${isCs ? "code" : "diagram"}/${question.id}" data-inspect="question.workspace">Open ${isCs ? "code" : "diagram"} workspace</a>
           </div>
         </form>

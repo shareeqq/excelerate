@@ -77,6 +77,7 @@ The strip above the app is deliberately outside it:
 - S4 Topic page with past paper and practice tabs, year / paper / difficulty filters, and the empty practice state.
 - S5 Question hub with the four tabs. The Solve tab has a styled upload control (choose or drop an image/PDF, with a file chip, a remove action and a contained image preview), **Scan and check** with a short checking simulation and plain-language feedback, and the Question help panel.
 - S5A Solution detail with the full solution, its likes and a comment thread with replies. Solutions that contain pseudocode get a **Try this solution** button that loads the code into the workspace.
+- **Walkthrough** — a step player that draws the working onto the question figure: play, pause, step back and forward, scrub and speed. Steps are authored annotations, not a recording.
 - S6 Result screen with the mark, earned and missed mark scheme points, feedback, and Next question / Retry / Share my solution.
 
 **Phase 2 — Review and help layer**
@@ -137,7 +138,8 @@ The strip above the app is deliberately outside it:
 - **The scan and check is a sample.** It pauses briefly to simulate reading the working, then compares the question's mark scheme with itself, uses the existing awarded mark when there is one, and never reads or uploads the attached file. It needs some typed working or an attached file before it shows a result, and its feedback is written from the mark-scheme points, not from the answer.
 - **The pseudocode runner is a small interpreter, not a compiler.** It supports one-dimensional arrays, procedures and functions, and the usual control flow; it has no file I/O, records, classes or 2D arrays, and it stops after 400,000 steps or 60 nested calls.
 - **The code review is rule-based.** It analyses the code's structure and names against the question's criteria and common mistakes. It does not understand meaning, and no model is called — the panel says so.
-- **Diagrams are hand-built inline SVG.** No charting library is loaded, so the single file stays self-contained and every figure follows the warm tokens.
+- **Diagrams are hand-built inline SVG.** No charting library is loaded, so the single file stays self-contained and every figure follows the warm tokens. The figure kit projects simple 3D-ish shapes and the diagram workspace recomputes the forces from the sliders.
+- **Walkthroughs are authored.** Each step is a caption plus a list of annotation shapes; the player reveals them in order. No video, recording or model is involved.
 - **Drafts are session-only.** A typed answer, an attachment name, an image preview, the last scan result and the help conversation survive switching between question tabs, but not a page reload.
 - **Walk me through uses authored steps** for the four demo questions and falls back to the mark scheme for the rest.
 - **Likes, new solutions and new comments are in memory.** They reset on reload. A like updates the same post the community feed shows.
@@ -159,6 +161,8 @@ The strip above the app is deliberately outside it:
 | `index.html` | Development shell |
 | `src/styles.css` | Design tokens, shared components, app shell, screen styles |
 | `src/pseudo.js` | The pseudocode interpreter used by the code workspace |
+| `src/figures.js` | Figure kit: primitives, oblique projection, semantic builders |
+| `src/ink.js` | Hand-drawn-looking annotation paths for the walkthrough player |
 | `src/data.js` | Mock data, figures, screen map, inspect notes |
 | `src/app.js` | Routing, state, inspect mode, screen templates and event wiring |
 | `build.mjs` | Inlines the source into `excelerate.html` |

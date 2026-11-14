@@ -3143,6 +3143,63 @@ a.subject-card:hover {
   font-weight: 500;
 }
 
+/* ---------- Walkthrough and ink ---------- */
+
+.walkthrough-stage {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  margin: var(--space-4) auto 0;
+}
+
+.walkthrough-stage .figure {
+  max-width: none;
+}
+
+.ink-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ink-layer svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.player {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.player__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.player__scrub {
+  flex: 1 1 120px;
+  min-width: 100px;
+  accent-color: var(--brand);
+}
+
+.player__count {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.player__caption {
+  margin-top: var(--space-3);
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
 .chat-empty {
   display: flex;
   flex-direction: column;
@@ -5633,6 +5690,77 @@ const QUESTION_DISCUSSION = {
   ]
 };
 
+/* Guided walkthroughs: a short script of annotations drawn over the
+   question figure, revealed step by step with play / pause / scrub. */
+const WALKTHROUGHS = {
+  "phy-kin-1": {
+    title: "Falling freely: speed, then height",
+    steps: [
+      {
+        caption: "Start with what the question gives you: u = 0, a = 9.8 m s⁻² and t = 1.8 s.",
+        marks: [
+          { type: "circle", cx: 212, cy: 26, rx: 40, ry: 13, style: "muted" },
+          { type: "underline", x1: 196, y1: 154, x2: 262, y2: 152, style: "highlight" }
+        ]
+      },
+      {
+        caption: "Speed first. v = u + at, so v = 0 + 9.8 × 1.8 = 17.7 m s⁻¹.",
+        marks: [
+          { type: "arrow", x1: 268, y1: 92, x2: 222, y2: 92, style: "accent" },
+          { type: "circle", cx: 258, cy: 86, rx: 42, ry: 14, style: "muted" }
+        ]
+      },
+      {
+        caption: "Height next. s = ut + ½at², and with u = 0 that is ½ × 9.8 × 1.8² = 15.9 m.",
+        marks: [
+          { type: "underline", x1: 182, y1: 152, x2: 182, y2: 62, style: "accent" },
+          { type: "circle", cx: 190, cy: 112, rx: 16, ry: 12, style: "muted" }
+        ]
+      },
+      {
+        caption: "Check both answers: m s⁻¹ for the speed, m for the height. A value without its unit loses the last mark.",
+        marks: [
+          { type: "arrow", x1: 150, y1: 150, x2: 176, y2: 168, style: "pen" },
+          { type: "underline", x1: 120, y1: 172, x2: 250, y2: 170, style: "highlight" }
+        ]
+      }
+    ]
+  },
+  "phy-dyn-3": {
+    title: "Down a rough plane",
+    steps: [
+      {
+        caption: "The weight W = mg = 4.0 × 9.81 = 39 N. Only part of it acts down the slope.",
+        marks: [
+          { type: "circle", cx: 166, cy: 122, rx: 30, ry: 26, style: "muted" },
+          { type: "underline", x1: 168, y1: 176, x2: 208, y2: 174, style: "highlight" }
+        ]
+      },
+      {
+        caption: "Component down the slope: mg sin 25° = 39 × 0.42 = 16.6 N.",
+        marks: [
+          { type: "arrow", x1: 96, y1: 152, x2: 124, y2: 134, style: "accent" },
+          { type: "circle", cx: 124, cy: 130, rx: 22, ry: 16, style: "muted" }
+        ]
+      },
+      {
+        caption: "Friction acts up the slope, so the resultant is 16.6 − 6.0 = 10.6 N down the slope.",
+        marks: [
+          { type: "circle", cx: 214, cy: 88, rx: 20, ry: 15, style: "muted" },
+          { type: "arrow", x1: 206, y1: 120, x2: 210, y2: 96, style: "accent" }
+        ]
+      },
+      {
+        caption: "Finally a = F / m = 10.6 / 4.0 = 2.6 m s⁻² down the slope.",
+        marks: [
+          { type: "underline", x1: 92, y1: 226, x2: 310, y2: 226, style: "accent" }
+        ]
+      }
+    ]
+  }
+};
+
+
 const ATTEMPTS = [
   { id: "a1", questionId: "phy-kin-1", date: "2026-11-10", awarded: 3, total: 4 },
   { id: "a2", questionId: "cs-prog-1", date: "2026-11-08", awarded: 4, total: 5 },
@@ -6879,6 +7007,20 @@ const INSPECT_NOTES = {
     lines: [
       "A simple placeholder for the diagram the question refers to.",
       "In the real app this would be the circuit, graph or flowchart."
+    ]
+  },
+  "question.walkthrough": {
+    title: "Walkthrough",
+    lines: [
+      "A short script of annotations drawn over the question, one step at a time.",
+      "The marks are authored shapes, not a recording — no video or live model is involved."
+    ]
+  },
+  "question.player": {
+    title: "Step player",
+    lines: [
+      "Play, pause, step back and forward, scrub, or change the speed.",
+      "Every step shows the reasoning for that line of working."
     ]
   },
   "question.figure": {
@@ -8159,10 +8301,139 @@ var Figures = (function () {
     return spec.caption || "";
   }
 
+  function measure(spec) {
+    var built = spec && spec.builder && builders[spec.builder]
+      ? builders[spec.builder](spec.params || {})
+      : (spec || {});
+    return { width: built.width || 360, height: built.height || 200 };
+  }
+
   return {
     render: render,
     caption: caption,
+    measure: measure,
     builders: builders
+  };
+})();
+
+</script>
+  <script>
+/* ============================================================
+   Excelerate — ink and annotations
+   Turns a small list of marks (underline, circle, arrow, freehand)
+   into hand-drawn looking SVG paths. The wobble is generated from a
+   deterministic hash, so re-rendering the same step looks identical.
+
+   Usage:
+     Ink.render(marks, width, height) -> "<svg …>…</svg>"
+   ============================================================ */
+
+var Ink = (function () {
+  "use strict";
+
+  function round(value) {
+    return Math.round(value * 10) / 10;
+  }
+
+  function noise(seed) {
+    var value = Math.sin(seed * 12.9898) * 43758.5453;
+    return value - Math.floor(value) - 0.5;
+  }
+
+  function wobblyLine(x1, y1, x2, y2, seed, steps) {
+    var points = [];
+    var total = steps || 16;
+    for (var i = 0; i <= total; i += 1) {
+      var t = i / total;
+      points.push({
+        x: x1 + (x2 - x1) * t + noise(seed + i * 3.7) * 1.5,
+        y: y1 + (y2 - y1) * t + noise(seed + 11 + i * 2.3) * 1.5
+      });
+    }
+    return points;
+  }
+
+  function wobblyEllipse(cx, cy, rx, ry, seed) {
+    var points = [];
+    var total = 44;
+    for (var i = 0; i <= total; i += 1) {
+      var angle = (i / total) * Math.PI * 2 + 0.35;
+      var scale = 1 + noise(seed + i * 1.7) * 0.05;
+      points.push({
+        x: cx + Math.cos(angle) * rx * scale,
+        y: cy + Math.sin(angle) * ry * scale
+      });
+    }
+    return points;
+  }
+
+  function smoothPath(points) {
+    if (!points || !points.length) return "";
+    if (points.length === 1) return "M" + round(points[0].x) + " " + round(points[0].y);
+    var path = "M" + round(points[0].x) + " " + round(points[0].y);
+    for (var i = 1; i < points.length - 1; i += 1) {
+      var midX = (points[i].x + points[i + 1].x) / 2;
+      var midY = (points[i].y + points[i + 1].y) / 2;
+      path += " Q" + round(points[i].x) + " " + round(points[i].y) + " " + round(midX) + " " + round(midY);
+    }
+    var last = points[points.length - 1];
+    path += " L" + round(last.x) + " " + round(last.y);
+    return path;
+  }
+
+  var styles = {
+    pen: { stroke: "var(--ink)", width: 2, opacity: 0.92 },
+    accent: { stroke: "var(--brand)", width: 2.1, opacity: 0.95 },
+    highlight: { stroke: "var(--brand)", width: 11, opacity: 0.13 },
+    muted: { stroke: "var(--muted)", width: 1.6, opacity: 0.8 }
+  };
+
+  function pathFor(mark, index) {
+    var seed = index * 7.31 + (mark.seed || 0);
+    if (mark.points) return smoothPath(mark.points);
+
+    switch (mark.type) {
+      case "underline":
+        return smoothPath(wobblyLine(mark.x1, mark.y1, mark.x2, mark.y2, seed));
+      case "circle":
+        return smoothPath(wobblyEllipse(mark.cx, mark.cy, mark.rx, mark.ry, seed));
+      case "arrow": {
+        var line = smoothPath(wobblyLine(mark.x1, mark.y1, mark.x2, mark.y2, seed, 12));
+        var angle = Math.atan2(mark.y2 - mark.y1, mark.x2 - mark.x1);
+        var size = mark.head || 8;
+        var left = {
+          x: mark.x2 - size * Math.cos(angle - 0.45),
+          y: mark.y2 - size * Math.sin(angle - 0.45)
+        };
+        var right = {
+          x: mark.x2 - size * Math.cos(angle + 0.45),
+          y: mark.y2 - size * Math.sin(angle + 0.45)
+        };
+        return line + " M" + round(left.x) + " " + round(left.y) + " L" + round(mark.x2) + " " + round(mark.y2) +
+          " L" + round(right.x) + " " + round(right.y);
+      }
+      default:
+        return "";
+    }
+  }
+
+  function markPath(mark, index) {
+    var style = styles[mark.style || "pen"] || styles.pen;
+    var path = pathFor(mark, index);
+    if (!path) return "";
+    return '<path d="' + path + '" fill="none" stroke="' + style.stroke + '" stroke-width="' + style.width +
+      '" stroke-linecap="round" stroke-linejoin="round" opacity="' + style.opacity + '"/>';
+  }
+
+  function render(marks, width, height) {
+    var list = (marks || []).map(markPath).join("");
+    return '<svg viewBox="0 0 ' + (width || 360) + " " + (height || 200) +
+      '" preserveAspectRatio="none" aria-hidden="true">' + list + "</svg>";
+  }
+
+  return {
+    render: render,
+    smoothPath: smoothPath
   };
 })();
 
@@ -8281,6 +8552,35 @@ var Figures = (function () {
   state.solutionQuestionId = null;
   state.codeDrafts = {};
   state.codePrefill = null;
+  state.walkthrough = null;
+  var walkTimer = null;
+
+  function stopWalkthrough() {
+    if (walkTimer) {
+      clearTimeout(walkTimer);
+      walkTimer = null;
+    }
+  }
+
+  function scheduleWalkthrough() {
+    stopWalkthrough();
+    var walk = state.walkthrough;
+    if (!walk || !walk.playing) return;
+    var total = (WALKTHROUGHS[walk.id] || { steps: [] }).steps.length;
+    walkTimer = setTimeout(function () {
+      if (!state.walkthrough || !state.walkthrough.playing) return;
+      if (state.walkthrough.step >= total - 1) {
+        state.walkthrough.playing = false;
+        renderScreen();
+        wireScreen();
+        return;
+      }
+      state.walkthrough.step += 1;
+      renderScreen();
+      wireScreen();
+      scheduleWalkthrough();
+    }, 2700 / (walk.speed || 1));
+  }
 
   var inspectedEl = null;
   var pinned = false;
@@ -8364,6 +8664,7 @@ var Figures = (function () {
       if (questionParts[1] === "solutions") return { name: "question", id: questionParts[0], tab: "solutions" };
       if (questionParts[1] === "discussion") return { name: "question", id: questionParts[0], tab: "discussion" };
       if (questionParts[1] === "stats") return { name: "question", id: questionParts[0], tab: "stats" };
+      if (questionParts[1] === "walkthrough") return { name: "walkthrough", id: questionParts[0] };
       return { name: "question", id: questionParts[0], tab: "solve" };
     }
     if (route.indexOf("/result/") === 0) return { name: "result", id: route.slice(8) };
@@ -8796,6 +9097,11 @@ var Figures = (function () {
         screen.innerHTML = TopicScreen(detail.id, detail.tab);
       } else if (detail.name === "question") {
         screen.innerHTML = QuestionScreen(detail.id, detail.tab);
+      } else if (detail.name === "walkthrough") {
+        if (!state.walkthrough || state.walkthrough.id !== detail.id) {
+          state.walkthrough = { id: detail.id, step: 0, playing: false, speed: 1 };
+        }
+        screen.innerHTML = WalkthroughScreen(detail.id);
       } else if (detail.name === "solution") {
         screen.innerHTML = SolutionDetailScreen(detail.questionId, detail.solutionId);
       } else if (detail.name === "review") {
@@ -8847,6 +9153,8 @@ var Figures = (function () {
   function render() {
     var openLayer = document.querySelector(".modal-layer:not([hidden])");
     if (openLayer) closeModal(openLayer);
+
+    if (state.route.indexOf("/walkthrough") === -1) stopWalkthrough();
 
     applyLayout();
     renderTopbar();
@@ -9600,6 +9908,69 @@ var Figures = (function () {
             openInfoModal("Full solution",
               '<p class="muted">' + esc(post.author) + " · " + esc(post.time) + "</p><p>" + esc(post.solution) + "</p>");
           });
+        });
+      }
+    }
+
+    var player = screen.querySelector("[data-player]");
+    if (player && state.walkthrough) {
+      var walkTotal = (WALKTHROUGHS[state.walkthrough.id] || { steps: [] }).steps.length;
+
+      var goToStep = function (value) {
+        state.walkthrough.step = Math.max(0, Math.min(value, walkTotal - 1));
+      };
+
+      var togglePlayer = player.querySelector("[data-player-toggle]");
+      if (togglePlayer) {
+        togglePlayer.addEventListener("click", function () {
+          if (!state.walkthrough.playing && state.walkthrough.step >= walkTotal - 1) {
+            state.walkthrough.step = 0;
+          }
+          state.walkthrough.playing = !state.walkthrough.playing;
+          renderScreen();
+          wireScreen();
+          scheduleWalkthrough();
+        });
+      }
+
+      var previousStep = player.querySelector("[data-player-prev]");
+      if (previousStep) {
+        previousStep.addEventListener("click", function () {
+          state.walkthrough.playing = false;
+          stopWalkthrough();
+          goToStep(state.walkthrough.step - 1);
+          renderScreen();
+          wireScreen();
+        });
+      }
+
+      var nextStep = player.querySelector("[data-player-next]");
+      if (nextStep) {
+        nextStep.addEventListener("click", function () {
+          state.walkthrough.playing = false;
+          stopWalkthrough();
+          goToStep(state.walkthrough.step + 1);
+          renderScreen();
+          wireScreen();
+        });
+      }
+
+      var scrubStep = player.querySelector("[data-player-scrub]");
+      if (scrubStep) {
+        scrubStep.addEventListener("input", function () {
+          state.walkthrough.playing = false;
+          stopWalkthrough();
+          goToStep(Number(scrubStep.value));
+          renderScreen();
+          wireScreen();
+        });
+      }
+
+      var playerSpeed = player.querySelector("[data-player-speed]");
+      if (playerSpeed) {
+        playerSpeed.addEventListener("change", function () {
+          state.walkthrough.speed = Number(playerSpeed.value);
+          if (state.walkthrough.playing) scheduleWalkthrough();
         });
       }
     }
@@ -11073,6 +11444,72 @@ var Figures = (function () {
       "</nav>";
   }
 
+  function WalkthroughScreen(id) {
+    var question = questionById(id);
+    var walkthrough = WALKTHROUGHS[id];
+    if (!question || !walkthrough) return NotFoundScreen();
+
+    var found = topicById(question.topicId);
+    var topic = found ? found.topic : null;
+    var subject = found ? found.subject : subjectById(question.subjectId);
+    var spec = FIGURES[id];
+    var size = spec ? Figures.measure(spec) : { width: 360, height: 200 };
+    var walk = state.walkthrough || { id: id, step: 0, playing: false, speed: 1 };
+    var maxStep = walkthrough.steps.length - 1;
+    var step = Math.max(0, Math.min(walk.step, maxStep));
+    var marks = [];
+    walkthrough.steps.slice(0, step + 1).forEach(function (entry) {
+      marks = marks.concat(entry.marks || []);
+    });
+
+    return `
+      <div class="screen flow">
+        ${Breadcrumb([
+          { label: subject ? subject.name : "Subject", route: "/topics/" + question.subjectId },
+          { label: topic ? topic.name : "Topic", route: "/topic/" + question.topicId },
+          { label: "Question", route: "/question/" + question.id },
+          { label: "Walkthrough" }
+        ])}
+
+        <div class="page-head">
+          <p class="eyebrow">Walkthrough · ${esc(walkthrough.title)}</p>
+          <h1 class="page-title">Walk me through it</h1>
+          <p class="lede">Press play and the working is drawn on the question, one step at a time.</p>
+        </div>
+
+        <section class="card card--plain question-card">
+          <p class="question-text">${esc(question.stem)}</p>
+          ${spec ? `
+            <div class="walkthrough-stage" data-inspect="question.walkthrough">
+              ${Figures.render(spec)}
+              <div class="ink-layer">${Ink.render(marks, size.width, size.height)}</div>
+            </div>` : ""}
+        </section>
+
+        <section class="player" data-player data-inspect="question.player">
+          <div class="player__bar">
+            <button type="button" class="btn btn--secondary btn--small" data-player-prev>Back</button>
+            <button type="button" class="btn btn--primary btn--small" data-player-toggle>${walk.playing ? "Pause" : "Play"}</button>
+            <button type="button" class="btn btn--secondary btn--small" data-player-next>Next</button>
+            <input class="player__scrub" type="range" min="0" max="${maxStep}" value="${step}" step="1" data-player-scrub aria-label="Walkthrough step">
+            <span class="player__count">${step + 1} / ${walkthrough.steps.length}</span>
+            <div class="select-wrap select-wrap--compact">
+              <select class="select select--compact" data-player-speed aria-label="Playback speed">
+                ${[0.5, 1, 2].map(function (speed) {
+                  return '<option value="' + speed + '"' + (walk.speed === speed ? " selected" : "") + ">" + speed + "×</option>";
+                }).join("")}
+              </select>
+            </div>
+          </div>
+          <p class="player__caption">${esc(walkthrough.steps[step].caption)}</p>
+        </section>
+
+        <div class="actions-row">
+          <a class="btn btn--secondary" href="#/question/${question.id}">Back to the question</a>
+        </div>
+      </div>`;
+  }
+
   function ScanChecking() {
     return `
       <div class="scan-result scan-result--busy" data-inspect="question.scanChecking" aria-busy="true">
@@ -11205,6 +11642,7 @@ var Figures = (function () {
           <div class="actions-row" data-inspect="question.actions">
             <button type="submit" class="btn btn--primary">Submit answer</button>
             <button type="button" class="btn btn--secondary" data-open-modal="demoModal" data-inspect="question.save">Save for later</button>
+            ${WALKTHROUGHS[question.id] ? '<a class="btn btn--secondary" href="#/question/' + question.id + '/walkthrough" data-inspect="question.walkthrough">Walkthrough</a>' : ""}
             <a class="btn btn--ghost" href="#/${isCs ? "code" : "diagram"}/${question.id}" data-inspect="question.workspace">Open ${isCs ? "code" : "diagram"} workspace</a>
           </div>
         </form>

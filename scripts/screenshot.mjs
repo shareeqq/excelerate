@@ -118,6 +118,11 @@ async function main() {
     ["/question/phy-dyn-3", "inclined-plane.png", "", "document.querySelector('.figure-box').scrollIntoView({ block: 'center' })"],
     ["/diagram/phy-dyn-3", "diagram-workspace.png", "", "document.querySelector('[data-figure-stage]').scrollIntoView({ block: 'start' })"],
     ["/question/phy-dyn-1", "velocity-time.png", "", "document.querySelector('.figure-box').scrollIntoView({ block: 'center' })"],
+    ["/question/phy-kin-1/walkthrough", "walkthrough.png", `(() => {
+      const scrub = document.querySelector('[data-player-scrub]');
+      scrub.value = '2';
+      scrub.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`, "document.querySelector('.walkthrough-stage').scrollIntoView({ block: 'center' })"],
     ["/assistant", "study-coach.png", "", ""]
   ];
 

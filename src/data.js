@@ -1020,6 +1020,77 @@ const QUESTION_DISCUSSION = {
   ]
 };
 
+/* Guided walkthroughs: a short script of annotations drawn over the
+   question figure, revealed step by step with play / pause / scrub. */
+const WALKTHROUGHS = {
+  "phy-kin-1": {
+    title: "Falling freely: speed, then height",
+    steps: [
+      {
+        caption: "Start with what the question gives you: u = 0, a = 9.8 m s⁻² and t = 1.8 s.",
+        marks: [
+          { type: "circle", cx: 212, cy: 26, rx: 40, ry: 13, style: "muted" },
+          { type: "underline", x1: 196, y1: 154, x2: 262, y2: 152, style: "highlight" }
+        ]
+      },
+      {
+        caption: "Speed first. v = u + at, so v = 0 + 9.8 × 1.8 = 17.7 m s⁻¹.",
+        marks: [
+          { type: "arrow", x1: 268, y1: 92, x2: 222, y2: 92, style: "accent" },
+          { type: "circle", cx: 258, cy: 86, rx: 42, ry: 14, style: "muted" }
+        ]
+      },
+      {
+        caption: "Height next. s = ut + ½at², and with u = 0 that is ½ × 9.8 × 1.8² = 15.9 m.",
+        marks: [
+          { type: "underline", x1: 182, y1: 152, x2: 182, y2: 62, style: "accent" },
+          { type: "circle", cx: 190, cy: 112, rx: 16, ry: 12, style: "muted" }
+        ]
+      },
+      {
+        caption: "Check both answers: m s⁻¹ for the speed, m for the height. A value without its unit loses the last mark.",
+        marks: [
+          { type: "arrow", x1: 150, y1: 150, x2: 176, y2: 168, style: "pen" },
+          { type: "underline", x1: 120, y1: 172, x2: 250, y2: 170, style: "highlight" }
+        ]
+      }
+    ]
+  },
+  "phy-dyn-3": {
+    title: "Down a rough plane",
+    steps: [
+      {
+        caption: "The weight W = mg = 4.0 × 9.81 = 39 N. Only part of it acts down the slope.",
+        marks: [
+          { type: "circle", cx: 166, cy: 122, rx: 30, ry: 26, style: "muted" },
+          { type: "underline", x1: 168, y1: 176, x2: 208, y2: 174, style: "highlight" }
+        ]
+      },
+      {
+        caption: "Component down the slope: mg sin 25° = 39 × 0.42 = 16.6 N.",
+        marks: [
+          { type: "arrow", x1: 96, y1: 152, x2: 124, y2: 134, style: "accent" },
+          { type: "circle", cx: 124, cy: 130, rx: 22, ry: 16, style: "muted" }
+        ]
+      },
+      {
+        caption: "Friction acts up the slope, so the resultant is 16.6 − 6.0 = 10.6 N down the slope.",
+        marks: [
+          { type: "circle", cx: 214, cy: 88, rx: 20, ry: 15, style: "muted" },
+          { type: "arrow", x1: 206, y1: 120, x2: 210, y2: 96, style: "accent" }
+        ]
+      },
+      {
+        caption: "Finally a = F / m = 10.6 / 4.0 = 2.6 m s⁻² down the slope.",
+        marks: [
+          { type: "underline", x1: 92, y1: 226, x2: 310, y2: 226, style: "accent" }
+        ]
+      }
+    ]
+  }
+};
+
+
 const ATTEMPTS = [
   { id: "a1", questionId: "phy-kin-1", date: "2026-11-10", awarded: 3, total: 4 },
   { id: "a2", questionId: "cs-prog-1", date: "2026-11-08", awarded: 4, total: 5 },
@@ -2266,6 +2337,20 @@ const INSPECT_NOTES = {
     lines: [
       "A simple placeholder for the diagram the question refers to.",
       "In the real app this would be the circuit, graph or flowchart."
+    ]
+  },
+  "question.walkthrough": {
+    title: "Walkthrough",
+    lines: [
+      "A short script of annotations drawn over the question, one step at a time.",
+      "The marks are authored shapes, not a recording — no video or live model is involved."
+    ]
+  },
+  "question.player": {
+    title: "Step player",
+    lines: [
+      "Play, pause, step back and forward, scrub, or change the speed.",
+      "Every step shows the reasoning for that line of working."
     ]
   },
   "question.figure": {

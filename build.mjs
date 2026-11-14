@@ -13,6 +13,7 @@ const css = readFileSync(resolve(root, "src/styles.css"), "utf8");
 const pseudo = readFileSync(resolve(root, "src/pseudo.js"), "utf8");
 const data = readFileSync(resolve(root, "src/data.js"), "utf8");
 const figures = readFileSync(resolve(root, "src/figures.js"), "utf8");
+const inkSource = readFileSync(resolve(root, "src/ink.js"), "utf8");
 const app = readFileSync(resolve(root, "src/app.js"), "utf8");
 
 const banner = `<!--
@@ -39,12 +40,16 @@ const out = html
     () => `<script>\n${figures}\n</script>`
   )
   .replace(
+    '<script src="src/ink.js"></script>',
+    () => `<script>\n${inkSource}\n</script>`
+  )
+  .replace(
     '<script src="src/app.js"></script>',
     () => `<script>\n${app}\n</script>`
   )
   .replace("<!doctype html>", () => `<!doctype html>\n${banner}`);
 
-const leftovers = ["src/styles.css", "src/pseudo.js", "src/data.js", "src/figures.js", "src/app.js"]
+const leftovers = ["src/styles.css", "src/pseudo.js", "src/data.js", "src/figures.js", "src/ink.js", "src/app.js"]
   .filter((reference) => out.includes(reference));
 if (leftovers.length) {
   throw new Error("Build failed: source references left behind: " + leftovers.join(", "));

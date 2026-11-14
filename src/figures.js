@@ -473,9 +473,17 @@ var Figures = (function () {
     return spec.caption || "";
   }
 
+  function measure(spec) {
+    var built = spec && spec.builder && builders[spec.builder]
+      ? builders[spec.builder](spec.params || {})
+      : (spec || {});
+    return { width: built.width || 360, height: built.height || 200 };
+  }
+
   return {
     render: render,
     caption: caption,
+    measure: measure,
     builders: builders
   };
 })();

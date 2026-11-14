@@ -854,12 +854,51 @@ check("the diagram workspace models the inclined plane", async (api) => {
   assert(weight.indexOf("39.2") !== -1, "weight readout wrong: " + weight);
 });
 
+check("the walkthrough plays step by step", async (api) => {
+  await api.goto("/question/phy-kin-1/walkthrough");
+  const first = await api.client.evaluate(`(() => ({
+    caption: document.querySelector('.player__caption').textContent,
+    count: document.querySelector('.player__count').textContent,
+    paths: document.querySelectorAll('.ink-layer path').length
+  }))()`);
+  assert(/1 \/ 4/.test(first.count), "unexpected step count: " + first.count);
+  assert(first.paths >= 2, "no ink on the first step");
+  await api.client.evaluate("document.querySelector('[data-player-toggle]').click()");
+  await sleep(3300);
+  const after = await api.client.evaluate(`(() => ({
+    caption: document.querySelector('.player__caption').textContent,
+    count: document.querySelector('.player__count').textContent,
+    paths: document.querySelectorAll('.ink-layer path').length
+  }))()`);
+  assert(after.count !== first.count, "play did not advance the step");
+  assert(after.caption !== first.caption, "the caption did not change");
+  assert(after.paths > first.paths, "the ink did not accumulate");
+  await api.client.evaluate("document.querySelector('[data-player-toggle]').click()");
+});
+
+check("the walkthrough scrubs to the last step", async (api) => {
+  await api.goto("/question/phy-dyn-3/walkthrough");
+  await api.client.evaluate(`(() => {
+    const scrub = document.querySelector('[data-player-scrub]');
+    scrub.value = '3';
+    scrub.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await sleep(200);
+  const state = await api.client.evaluate(`(() => ({
+    count: document.querySelector('.player__count').textContent,
+    paths: document.querySelectorAll('.ink-layer path').length
+  }))()`);
+  assert(/4 \/ 4/.test(state.count), "scrub did not reach the last step: " + state.count);
+  assert(state.paths >= 4, "the last step should show every mark");
+});
+
 const STUDENT_ROUTES = [
   "/", "/foundations", "/sitemap", "/login", "/topics", "/topics/cs", "/topics/physics",
   "/topic/phy-kinematics", "/topic/phy-kinematics/practice", "/topic/cs-databases",
   "/question/phy-kin-1", "/question/phy-kin-1/solutions",
   "/question/phy-kin-1/solutions/post-2", "/question/phy-kin-1/discussion",
-  "/question/phy-kin-1/stats", "/question/cs-prog-1/solutions/post-1",
+  "/question/phy-kin-1/stats", "/question/phy-kin-1/walkthrough",
+  "/question/cs-prog-1/solutions/post-1",
   "/question/phy-dyn-1/solutions", "/result/phy-kin-1", "/code/cs-prog-1",
   "/diagram/phy-dyn-1", "/assistant", "/progress", "/community", "/post-solution",
   "/notes", "/notifications", "/profile"
