@@ -409,9 +409,13 @@ var Pseudo = (function () {
     return statements;
   };
 
-  Program.prototype.expectWord = function (word) {
-    if (this.position >= this.lines.length || this.firstWord() !== word) {
-      throw { message: "Expected " + word, line: this.lines[this.position] ? this.lines[this.position].line : 0 };
+  Program.prototype.expectWord = function (word, anchorLine) {
+    var atEnd = this.position >= this.lines.length;
+    var line = atEnd
+      ? (anchorLine || (this.lines.length ? this.lines[this.lines.length - 1].line : 0))
+      : this.lines[this.position].line;
+    if (atEnd || this.firstWord() !== word) {
+      throw { message: "Expected " + word, line: line };
     }
     this.position += 1;
   };
@@ -434,7 +438,7 @@ var Pseudo = (function () {
         this.position += 1;
         elseBody = this.parseBlock(["ENDIF"]);
       }
-      this.expectWord("ENDIF");
+      this.expectWord("ENDIF", line);
       statement = { type: "if", test: parseExpression(conditionText), then: thenBody, otherwise: elseBody, line: line };
       return statement;
     }
@@ -444,7 +448,7 @@ var Pseudo = (function () {
       if (!matchFor) throw { message: "FOR needs: FOR i <- start TO end", line: line };
       this.position += 1;
       var body = this.parseBlock(["NEXT"]);
-      this.expectWord("NEXT");
+      this.expectWord("NEXT", line);
       return {
         type: "for",
         name: matchFor[1].toLowerCase(),
@@ -460,14 +464,14 @@ var Pseudo = (function () {
       var conditionWhile = text.replace(/^WHILE\s+/i, "").replace(/\s+DO\s*$/i, "");
       this.position += 1;
       var whileBody = this.parseBlock(["ENDWHILE"]);
-      this.expectWord("ENDWHILE");
+      this.expectWord("ENDWHILE", line);
       return { type: "while", test: parseExpression(conditionWhile), body: whileBody, line: line };
     }
 
     if (word === "REPEAT") {
       this.position += 1;
       var repeatBody = this.parseBlock(["UNTIL"]);
-      this.expectWord("UNTIL");
+      this.expectWord("UNTIL", line);
       var untilEntry = this.lines[this.position - 1];
       var untilCondition = untilEntry.text.replace(/^UNTIL\s+/i, "");
       return { type: "repeat", test: parseExpression(untilCondition), body: repeatBody, line: line };
@@ -482,7 +486,7 @@ var Pseudo = (function () {
       }) : [];
       this.position += 1;
       var routineBody = this.parseBlock([kind === "PROCEDURE" ? "ENDPROCEDURE" : "ENDFUNCTION"]);
-      this.expectWord(kind === "PROCEDURE" ? "ENDPROCEDURE" : "ENDFUNCTION");
+      this.expectWord(kind === "PROCEDURE" ? "ENDPROCEDURE" : "ENDFUNCTION", line);
       return {
         type: "routine",
         kind: kind,
@@ -1015,5 +1019,268 @@ var Pseudo = (function () {
     }
   }
 
-  return { run: run };
+  /* ---------- Facts, lints and review ---------- */
+
+  function newFacts() {
+    return {
+      declares: [],
+      arrays: [],
+      inputs: 0,
+      outputs: [],
+      outputVariables: 0,
+      fors: [],
+      whiles: 0,
+      repeats: 0,
+      ifs: [],
+      routines: [],
+      calls: [],
+      assigns: [],
+      selfAssigns: [],
+      returns: 0,
+      reads: []
+    };
+  }
+
+  function collectNames(node, out) {
+    if (!node) return;
+    switch (node.type) {
+      case "name":
+        out.push(node.name);
+        return;
+      case "index":
+        out.push(node.name);
+        collectNames(node.index, out);
+        return;
+      case "index2":
+        out.push(node.name);
+        collectNames(node.row, out);
+        collectNames(node.column, out);
+        return;
+      case "unary":
+        collectNames(node.value, out);
+        return;
+      case "binary":
+        collectNames(node.left, out);
+        collectNames(node.right, out);
+        return;
+      case "call":
+        node.args.forEach(function (argument) {
+          collectNames(argument, out);
+        });
+        return;
+      default:
+        return;
+    }
+  }
+
+  function literalNumber(node) {
+    if (!node) return null;
+    if (node.type === "number") return node.value;
+    if (node.type === "unary" && node.op === "-" && node.value.type === "number") return -node.value.value;
+    return null;
+  }
+
+  function conditionInfo(test) {
+    var info = { op: null, names: [], otherNames: [] };
+    if (!test) return info;
+    if (test.type === "binary" && ["=", "<>", "<", ">", "<=", ">="].indexOf(test.op) !== -1) {
+      info.op = test.op;
+      collectNames(test.left, info.names);
+      collectNames(test.right, info.otherNames);
+      info.names = info.names.concat(info.otherNames);
+    }
+    return info;
+  }
+
+  function assignedNames(statements, out) {
+    statements.forEach(function (statement) {
+      switch (statement.type) {
+        case "assign":
+          out.push(statement.target.name);
+          break;
+        case "input":
+          statement.targets.forEach(function (target) {
+            if (target.type === "name") out.push(target.name);
+            if (target.type === "index") out.push(target.name);
+          });
+          break;
+        case "if":
+          assignedNames(statement.then, out);
+          assignedNames(statement.otherwise, out);
+          break;
+        case "for":
+        case "while":
+        case "repeat":
+          assignedNames(statement.body, out);
+          break;
+        case "routine":
+          assignedNames(statement.body, out);
+          break;
+        default:
+          break;
+      }
+    });
+    return out;
+  }
+
+  function collectFacts(statements, facts) {
+    statements.forEach(function (statement) {
+      switch (statement.type) {
+        case "declare":
+          statement.names.forEach(function (entry) {
+            facts.declares.push(entry.name);
+            if (entry.bounds) facts.arrays.push(entry.name);
+          });
+          break;
+        case "input":
+          facts.inputs += statement.targets.length;
+          statement.targets.forEach(function (target) {
+            if (target.type === "index") collectNames(target.index, facts.reads);
+          });
+          break;
+        case "output":
+          var variables = [];
+          statement.values.forEach(function (value) {
+            collectNames(value, variables);
+          });
+          facts.outputs.push({ count: statement.values.length, variables: variables.length });
+          facts.outputVariables += variables.length;
+          statement.values.forEach(function (value) {
+            collectNames(value, facts.reads);
+          });
+          break;
+        case "assign":
+          facts.assigns.push(statement.target.name);
+          var selfNames = [];
+          collectNames(statement.value, selfNames);
+          if (selfNames.indexOf(statement.target.name) !== -1 &&
+            statement.value.type === "binary" && statement.value.op === "+") {
+            facts.selfAssigns.push(statement.target.name);
+          }
+          if (statement.target.type === "index") collectNames(statement.target.index, facts.reads);
+          collectNames(statement.value, facts.reads);
+          break;
+        case "if":
+          var info = conditionInfo(statement.test);
+          facts.ifs.push({
+            op: info.op,
+            names: info.names,
+            assigned: assignedNames(statement.then, []),
+            line: statement.line
+          });
+          collectNames(statement.test, facts.reads);
+          collectFacts(statement.then, facts);
+          collectFacts(statement.otherwise, facts);
+          break;
+        case "for":
+          var from = literalNumber(statement.from);
+          var to = literalNumber(statement.to);
+          facts.fors.push({ name: statement.name, from: from, to: to, line: statement.line });
+          collectNames(statement.from, facts.reads);
+          collectNames(statement.to, facts.reads);
+          if (statement.step) collectNames(statement.step, facts.reads);
+          collectFacts(statement.body, facts);
+          break;
+        case "while":
+          facts.whiles += 1;
+          collectNames(statement.test, facts.reads);
+          collectFacts(statement.body, facts);
+          break;
+        case "repeat":
+          facts.repeats += 1;
+          collectNames(statement.test, facts.reads);
+          collectFacts(statement.body, facts);
+          break;
+        case "routine":
+          facts.routines.push({ name: statement.name, kind: statement.kind, params: statement.params });
+          collectFacts(statement.body, facts);
+          break;
+        case "call":
+          facts.calls.push(statement.name);
+          statement.args.forEach(function (argument) {
+            collectNames(argument, facts.reads);
+          });
+          break;
+        case "return":
+          facts.returns += 1;
+          collectNames(statement.value, facts.reads);
+          break;
+        default:
+          break;
+      }
+    });
+    return facts;
+  }
+
+  function lint(source, facts) {
+    var findings = [];
+    if (!String(source).trim()) {
+      return [{ level: "error", text: "The editor is empty. Start from the template." }];
+    }
+
+    if (!facts.outputs.length) {
+      findings.push({ level: "warn", text: "Nothing is ever OUTPUT, so a marker cannot see a result." });
+    } else if (facts.outputVariables === 0) {
+      findings.push({ level: "warn", text: "Every OUTPUT prints a fixed value. Print the variables so the output follows the input." });
+    }
+
+    var known = {};
+    facts.declares.forEach(function (name) { known[name] = true; });
+    facts.fors.forEach(function (loop) { known[loop.name] = true; });
+    facts.routines.forEach(function (routine) {
+      routine.params.forEach(function (param) { known[param] = true; });
+    });
+
+    var undeclared = [];
+    facts.reads.concat(facts.assigns).forEach(function (name) {
+      if (!known[name] && undeclared.indexOf(name) === -1) undeclared.push(name);
+    });
+    if (undeclared.length) {
+      findings.push({
+        level: "warn",
+        text: "Used without a DECLARE: " + undeclared.slice(0, 4).join(", ") +
+          ". A marker expects every variable to be declared first."
+      });
+    }
+
+    facts.fors.forEach(function (loop) {
+      if (facts.assigns.filter(function (name) { return name === loop.name; }).length &&
+        loop.line) {
+        findings.push({
+          level: "warn",
+          text: "Line " + loop.line + ": the FOR counter " + loop.name +
+            " is also assigned inside the program. Let the loop control it."
+        });
+      }
+    });
+
+    if (facts.routines.some(function (routine) { return routine.kind === "FUNCTION"; }) && facts.returns === 0) {
+      findings.push({ level: "warn", text: "A FUNCTION is declared but never uses RETURN." });
+    }
+
+    return findings;
+  }
+
+  function analyse(source) {
+    var program;
+    try {
+      program = new Program(source);
+      var statements = program.parseBlock([]);
+      if (program.position < program.lines.length) {
+        throw { message: "Unexpected " + program.lines[program.position].text, line: program.lines[program.position].line };
+      }
+      var facts = collectFacts(statements, newFacts());
+      return { ok: true, facts: facts, findings: lint(source, facts), error: null, line: 0 };
+    } catch (error) {
+      return {
+        ok: false,
+        facts: newFacts(),
+        findings: [],
+        error: error && error.message ? error.message : "Something in the program could not be read",
+        line: error && error.line ? error.line : 0
+      };
+    }
+  }
+
+  return { run: run, analyse: analyse };
 })();

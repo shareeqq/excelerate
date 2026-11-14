@@ -777,6 +777,56 @@ check("try a solution loads and runs it", async (api) => {
   assert(out.indexOf("Largest: 99") !== -1, "the loaded solution did not run: " + out.slice(0, 120));
 });
 
+check("code review scores the starter program", async (api) => {
+  await api.goto("/code/cs-alg-1");
+  await api.client.evaluate("document.querySelector('[data-reset-code]').click()");
+  await sleep(200);
+  await api.client.evaluate("document.querySelector('[data-review-code]').click()");
+  await sleep(150);
+  const busy = await api.client.evaluate("Boolean(document.querySelector('.review-card--busy'))");
+  assert(busy, "no reviewing state after Review");
+  await sleep(1400);
+  const state = await api.client.evaluate(`(() => ({
+    text: document.querySelector('.review-card').innerText,
+    met: document.querySelectorAll('.review-item.is-met').length,
+    missing: document.querySelectorAll('.review-item.is-missing').length
+  }))()`);
+  assert(state.met === 4 && state.missing === 0,
+    "starter should pass every check, got " + state.met + " met / " + state.missing + " missing");
+  assert(state.text.indexOf("rule-based") !== -1, "missing the honest disclaimer");
+});
+
+check("code review flags a missing output", async (api) => {
+  await api.goto("/code/cs-prog-1");
+  await api.client.evaluate(`(() => {
+    const editor = document.querySelector('[data-code-editor]');
+    editor.value = 'DECLARE x : INTEGER\\nx <- 1';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('[data-review-code]').click();
+  })()`);
+  await sleep(1400);
+  const state = await api.client.evaluate(`(() => ({
+    text: document.querySelector('.review-card').innerText,
+    missing: document.querySelectorAll('.review-item.is-missing').length
+  }))()`);
+  assert(state.text.indexOf("OUTPUT") !== -1, "missing-output finding not shown: " + state.text.slice(0, 120));
+  assert(state.missing > 0, "criteria should show as missing");
+});
+
+check("code review stops on a syntax error", async (api) => {
+  await api.goto("/code/cs-prog-1");
+  await api.client.evaluate(`(() => {
+    const editor = document.querySelector('[data-code-editor]');
+    editor.value = 'IF x > 1 THEN\\nOUTPUT 1';
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('[data-review-code]').click();
+  })()`);
+  await sleep(1400);
+  const text = await api.client.evaluate("document.querySelector('.review-card').innerText");
+  assert(/review stopped/i.test(text), "no stopped state: " + text.slice(0, 80));
+  assert(/Line 1/.test(text), "line number missing: " + text.slice(0, 80));
+});
+
 const STUDENT_ROUTES = [
   "/", "/foundations", "/sitemap", "/login", "/topics", "/topics/cs", "/topics/physics",
   "/topic/phy-kinematics", "/topic/phy-kinematics/practice", "/topic/cs-databases",

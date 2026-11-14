@@ -88,7 +88,7 @@ The strip above the app is deliberately outside it:
 
 **Phase 3 — Subject tools**
 
-- S11 Code workspace in a LeetCode-style layout: the question and a fixed template on the left, a numbered editor with Run and Reset on the right, and an output console. The editor runs a small **pseudocode interpreter** (`src/pseudo.js`) that understands `DECLARE`, `INPUT`, `OUTPUT`, `IF`, `FOR`, `WHILE`, `REPEAT`, procedures and functions, arrays, and the usual operators — so the starter program really executes and errors name their line. A dry-run table and a final answer box sit below.
+- S11 Code workspace in a LeetCode-style layout: the question and a fixed template on the left, a numbered editor with Run, Review and Reset on the right, and an output console. The editor runs a small **pseudocode interpreter** (`src/pseudo.js`) that understands `DECLARE`, `INPUT`, `OUTPUT`, `IF`, `FOR`, `WHILE`, `REPEAT`, procedures and functions, arrays, and the usual operators — so the starter program really executes and errors name their line. **Review** then checks the code against the steps this question's mark scheme rewards (array declared, values read, largest and smallest tracked, both outputs present) and lists common mistakes with line numbers. A dry-run table and a final answer box sit below.
 - S12 Diagram workspace for Physics: an adjustable force/angle diagram, Reset diagram, notes and an answer box.
 
 **Physics and CS diagrams.** Questions carry a simple 2D figure drawn as inline SVG: falling bodies, force arrows, springs, the pump, wave superposition, a diffraction grating, circuits, quark composition, a queue with pointers, logic gates and a flowchart.
@@ -136,6 +136,7 @@ The strip above the app is deliberately outside it:
 - **Mock marking.** Submitting an answer opens a sample result built from the question's mark scheme. No answer is checked.
 - **The scan and check is a sample.** It pauses briefly to simulate reading the working, then compares the question's mark scheme with itself, uses the existing awarded mark when there is one, and never reads or uploads the attached file. It needs some typed working or an attached file before it shows a result, and its feedback is written from the mark-scheme points, not from the answer.
 - **The pseudocode runner is a small interpreter, not a compiler.** It supports one-dimensional arrays, procedures and functions, and the usual control flow; it has no file I/O, records, classes or 2D arrays, and it stops after 400,000 steps or 60 nested calls.
+- **The code review is rule-based.** It analyses the code's structure and names against the question's criteria and common mistakes. It does not understand meaning, and no model is called — the panel says so.
 - **Diagrams are hand-built inline SVG.** No charting library is loaded, so the single file stays self-contained and every figure follows the warm tokens.
 - **Drafts are session-only.** A typed answer, an attachment name, an image preview, the last scan result and the help conversation survive switching between question tabs, but not a page reload.
 - **Walk me through uses authored steps** for the four demo questions and falls back to the mark scheme for the rest.

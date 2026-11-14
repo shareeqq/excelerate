@@ -1084,6 +1084,14 @@ const CODE_WORKSPACES = {
   "cs-prog-1": {
     starterCode: "PROCEDURE LargestAndSmallest\n    DECLARE values : ARRAY[1:10] OF INTEGER\n    DECLARE largest, smallest, i : INTEGER\n\n    FOR i <- 1 TO 10\n        INPUT values[i]\n    NEXT i\n\n    largest <- values[1]\n    smallest <- values[1]\n\n    FOR i <- 2 TO 10\n        IF values[i] > largest THEN\n            largest <- values[i]\n        ENDIF\n        IF values[i] < smallest THEN\n            smallest <- values[i]\n        ENDIF\n    NEXT i\n\n    OUTPUT \"Largest: \", largest\n    OUTPUT \"Smallest: \", smallest\nEND PROCEDURE\n\nCALL LargestAndSmallest",
     sampleInput: "42\n3\n18\n99\n-4\n7\n7\n12\n0\n31",
+    review: [
+      { id: "declares-array", label: "Declares a 1D array for the ten values", fix: "Add DECLARE values : ARRAY[1:10] OF INTEGER before the loop." },
+      { id: "reads-input", label: "Reads the values with INPUT", fix: "Read each value with INPUT inside the loop." },
+      { id: "loops", label: "Loops through the values", fix: "Use FOR i <- 1 TO 10 … NEXT i." },
+      { id: "tracks-max", label: "Updates largest when a value is greater", fix: "Inside the loop: IF value > largest THEN largest <- value." },
+      { id: "tracks-min", label: "Updates smallest when a value is smaller", fix: "Inside the loop: IF value < smallest THEN smallest <- value." },
+      { id: "outputs-both", label: "Outputs both results", fix: "Add an OUTPUT line for largest and one for smallest." }
+    ],
     variables: ["i", "value", "largest", "smallest"],
     rows: [
       ["1", "42", "42", "42"],
@@ -1095,6 +1103,12 @@ const CODE_WORKSPACES = {
   "cs-alg-1": {
     starterCode: "DECLARE count : INTEGER\ncount <- 0\n\nFOR i <- 1 TO 5\n    count <- count + i\nNEXT i\n\nOUTPUT count",
     sampleInput: "",
+    review: [
+      { id: "declares", label: "Declares the variables it uses", fix: "Add DECLARE statements at the top." },
+      { id: "loops", label: "Uses a loop to repeat the work", fix: "Wrap the repeated steps in FOR … NEXT." },
+      { id: "accumulates", label: "Adds each value to a running total", fix: "Inside the loop: total <- total + value." },
+      { id: "outputs", label: "Outputs the result", fix: "Add an OUTPUT line at the end." }
+    ],
     variables: ["i", "count"],
     rows: [
       ["1", "1"],
@@ -2866,8 +2880,15 @@ const INSPECT_NOTES = {
   "code.toolbar": {
     title: "Editor toolbar",
     lines: [
-      "Run executes the pseudocode; Reset puts the starter code back.",
-      "The runner is a small local interpreter, not a real compiler."
+      "Run executes the pseudocode; Review checks it against the steps a marker looks for; Reset puts the starter code back.",
+      "The runner and the review are local, rule-based tools, not a real compiler or a live model."
+    ]
+  },
+  "code.review": {
+    title: "Code review",
+    lines: [
+      "Checks the code for the steps this question's mark scheme rewards, plus common mistakes.",
+      "It reads structure and names, not meaning: the feedback is rule-based and honest about it."
     ]
   },
   "code.console": {

@@ -87,7 +87,8 @@
     close: svg('<path d="M6 6l12 12M18 6L6 18"></path>'),
     play: svg('<path d="M7 4l13 8-13 8z"></path>'),
     reset: svg('<path d="M4 4v6h6"></path><path d="M4.5 10a8 8 0 1 1 1.5 6"></path>'),
-    terminal: svg('<path d="M4 6h16v12H4z"></path><path d="M8 10l2 2-2 2"></path><path d="M13 14h4"></path>')
+    terminal: svg('<path d="M4 6h16v12H4z"></path><path d="M8 10l2 2-2 2"></path><path d="M13 14h4"></path>'),
+    spark: svg('<path d="M12 3l1.7 4.6L18.5 9.5l-4.8 1.9L12 16l-1.7-4.6L5.5 9.5l4.8-1.9z"></path><path d="M18 16.5l.8 2.1 2.2.9-2.2.9-.8 2.1-.8-2.1-2.2-.9 2.2-.9z"></path>')
   };
 
   var app = document.getElementById("app");
@@ -1211,10 +1212,37 @@
           var workspace = CODE_WORKSPACES[codeQuestionId];
           draft.code = workspace ? workspace.starterCode : "// Write your pseudocode here\n";
           draft.result = null;
+          draft.review = null;
+          draft.reviewing = false;
           draft.fromSolution = "";
           renderScreen();
           wireScreen();
           refreshInspect();
+        });
+      }
+
+      var reviewCode = screen.querySelector("[data-review-code]");
+      if (reviewCode) {
+        reviewCode.addEventListener("click", function () {
+          var draft = codeDraftFor(codeQuestionId);
+          draft.code = codeEditor.value;
+          if (codeInput) draft.input = codeInput.value;
+          draft.reviewing = true;
+          draft.review = null;
+          renderScreen();
+          wireScreen();
+          refreshInspect();
+          var pendingId = codeQuestionId;
+          setTimeout(function () {
+            var pending = codeDraftFor(pendingId);
+            pending.review = buildReview(questionById(pendingId), pending.code);
+            pending.reviewing = false;
+            if (state.route === "/code/" + pendingId) {
+              renderScreen();
+              wireScreen();
+              refreshInspect();
+            }
+          }, 1100);
         });
       }
 
@@ -3901,10 +3929,119 @@
         code: workspace.starterCode || "// Write your pseudocode here\n",
         input: workspace.sampleInput || "",
         result: null,
+        review: null,
+        reviewing: false,
         fromSolution: ""
       };
     }
     return state.codeDrafts[questionId];
+  }
+
+  function tracksExtreme(facts, op) {
+    return facts.ifs.some(function (info) {
+      return info.op === op && info.assigned.some(function (name) {
+        return info.names.indexOf(name) !== -1;
+      });
+    });
+  }
+
+  function criterionMet(id, facts) {
+    switch (id) {
+      case "declares": return facts.declares.length > 0;
+      case "declares-array": return facts.arrays.length > 0;
+      case "reads-input": return facts.inputs > 0;
+      case "loops": return facts.fors.length + facts.whiles + facts.repeats > 0;
+      case "tracks-max": return tracksExtreme(facts, ">");
+      case "tracks-min": return tracksExtreme(facts, "<");
+      case "outputs": return facts.outputs.length > 0;
+      case "outputs-both": return facts.outputVariables >= 2;
+      case "accumulates": return facts.selfAssigns.length > 0;
+      default: return false;
+    }
+  }
+
+  function buildReview(question, code) {
+    var workspace = CODE_WORKSPACES[question.id] || {};
+    var criteria = workspace.review || [];
+    var analysis = Pseudo.analyse(code);
+    var checks = criteria.map(function (criterion) {
+      return {
+        label: criterion.label,
+        fix: criterion.fix,
+        met: analysis.ok ? criterionMet(criterion.id, analysis.facts) : false
+      };
+    });
+    return {
+      ok: analysis.ok,
+      error: analysis.error,
+      line: analysis.line,
+      checks: checks,
+      findings: analysis.findings,
+      met: checks.filter(function (check) { return check.met; }).length,
+      total: checks.length
+    };
+  }
+
+  function CodeReviewPanel(question, draft) {
+    if (draft.reviewing) {
+      return `
+        <section class="review-card review-card--busy" data-inspect="code.review" aria-busy="true">
+          <div class="review-card__head">
+            <p class="eyebrow">Reviewing your code</p>
+            <span class="scan-dot" aria-hidden="true"></span>
+          </div>
+          <ul class="scan-steps">
+            <li>Reading the structure</li>
+            <li>Checking the steps a marker looks for</li>
+            <li>Writing feedback</li>
+          </ul>
+          <p class="muted">This review is rule-based and runs inside the page.</p>
+        </section>`;
+    }
+    if (!draft.review) return "";
+
+    var review = draft.review;
+    if (!review.ok) {
+      return `
+        <section class="review-card review-card--error" data-inspect="code.review">
+          <p class="eyebrow">Review stopped</p>
+          <p class="console__status console__status--error">Line ${review.line}: ${esc(review.error)}</p>
+          <p class="muted">Fix that line, then run the review again.</p>
+        </section>`;
+    }
+
+    return `
+      <section class="review-card" data-inspect="code.review">
+        <div class="review-card__head">
+          <div>
+            <p class="eyebrow">Code review · prototype</p>
+            <h2 class="subsection-title">What a marker looks for</h2>
+          </div>
+          <p class="review-card__score">${review.met} / ${review.total}</p>
+        </div>
+        <ul class="review-list">
+          ${review.checks.map(function (check) {
+            return `
+              <li class="review-item ${check.met ? "is-met" : "is-missing"}">
+                <span class="review-item__mark" aria-hidden="true">${check.met ? "✓" : "!"}</span>
+                <span class="review-item__body">
+                  <span class="review-item__label">${esc(check.label)}</span>
+                  ${check.met ? "" : '<span class="review-item__fix">' + esc(check.fix) + "</span>"}
+                </span>
+              </li>`;
+          }).join("")}
+        </ul>
+        ${review.findings.length ? `
+          <div class="review-findings">
+            <p class="field__label">Worth fixing</p>
+            <ul class="review-findings__list">
+              ${review.findings.map(function (finding) {
+                return '<li class="review-finding">' + esc(finding.text) + "</li>";
+              }).join("")}
+            </ul>
+          </div>` : ""}
+        <p class="field__hint">A rule-based review of the code you wrote. It checks structure and common mistakes, not meaning — no live model is involved.</p>
+      </section>`;
   }
 
   function codeLineNumbers(code) {
@@ -3999,6 +4136,7 @@
                 <span class="code-window__name">question.pseudo</span>
                 <div class="actions-row">
                   <button type="button" class="btn btn--secondary btn--small" data-run-code>${ICONS.play} Run</button>
+                  <button type="button" class="btn btn--secondary btn--small" data-review-code>${ICONS.spark} Review</button>
                   <button type="button" class="btn btn--ghost btn--small" data-reset-code>${ICONS.reset} Reset</button>
                 </div>
               </div>
@@ -4015,6 +4153,8 @@
               </div>
               <div data-code-output-text>${CodeConsole(draft.result)}</div>
             </div>
+
+            ${CodeReviewPanel(question, draft)}
           </section>
         </div>
 

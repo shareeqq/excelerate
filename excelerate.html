@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   Excelerate — structural prototype (Phases 0–5 · post-review revision)
-  Built from index.html and src/ on 2026-11-13.
+  Built from index.html and src/ on 2026-11-14.
   This file is self-contained. Open it directly in a browser.
 -->
 <html lang="en">
@@ -3025,6 +3025,124 @@ a.subject-card:hover {
   white-space: pre;
 }
 
+.review-card {
+  padding: var(--space-4);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.review-card--busy {
+  border-style: dashed;
+  background: var(--panel);
+}
+
+.review-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.review-card__score {
+  color: var(--ink);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+.review-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.review-item:last-child {
+  border-bottom: 0;
+}
+
+.review-item__mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-round);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.review-item.is-met .review-item__mark {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.review-item.is-missing .review-item__mark {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.review-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.review-item__label {
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.review-item__fix {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.review-findings {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--hairline);
+}
+
+.review-findings__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  list-style: none;
+}
+
+.review-finding {
+  position: relative;
+  padding-left: var(--space-4);
+  color: var(--body);
+  font-size: var(--text-sm);
+}
+
+.review-finding::before {
+  content: "!";
+  position: absolute;
+  left: 0;
+  color: var(--error);
+  font-weight: 500;
+}
+
 .chat-empty {
   display: flex;
   flex-direction: column;
@@ -3615,9 +3733,13 @@ var Pseudo = (function () {
     return statements;
   };
 
-  Program.prototype.expectWord = function (word) {
-    if (this.position >= this.lines.length || this.firstWord() !== word) {
-      throw { message: "Expected " + word, line: this.lines[this.position] ? this.lines[this.position].line : 0 };
+  Program.prototype.expectWord = function (word, anchorLine) {
+    var atEnd = this.position >= this.lines.length;
+    var line = atEnd
+      ? (anchorLine || (this.lines.length ? this.lines[this.lines.length - 1].line : 0))
+      : this.lines[this.position].line;
+    if (atEnd || this.firstWord() !== word) {
+      throw { message: "Expected " + word, line: line };
     }
     this.position += 1;
   };
@@ -3640,7 +3762,7 @@ var Pseudo = (function () {
         this.position += 1;
         elseBody = this.parseBlock(["ENDIF"]);
       }
-      this.expectWord("ENDIF");
+      this.expectWord("ENDIF", line);
       statement = { type: "if", test: parseExpression(conditionText), then: thenBody, otherwise: elseBody, line: line };
       return statement;
     }
@@ -3650,7 +3772,7 @@ var Pseudo = (function () {
       if (!matchFor) throw { message: "FOR needs: FOR i <- start TO end", line: line };
       this.position += 1;
       var body = this.parseBlock(["NEXT"]);
-      this.expectWord("NEXT");
+      this.expectWord("NEXT", line);
       return {
         type: "for",
         name: matchFor[1].toLowerCase(),
@@ -3666,14 +3788,14 @@ var Pseudo = (function () {
       var conditionWhile = text.replace(/^WHILE\s+/i, "").replace(/\s+DO\s*$/i, "");
       this.position += 1;
       var whileBody = this.parseBlock(["ENDWHILE"]);
-      this.expectWord("ENDWHILE");
+      this.expectWord("ENDWHILE", line);
       return { type: "while", test: parseExpression(conditionWhile), body: whileBody, line: line };
     }
 
     if (word === "REPEAT") {
       this.position += 1;
       var repeatBody = this.parseBlock(["UNTIL"]);
-      this.expectWord("UNTIL");
+      this.expectWord("UNTIL", line);
       var untilEntry = this.lines[this.position - 1];
       var untilCondition = untilEntry.text.replace(/^UNTIL\s+/i, "");
       return { type: "repeat", test: parseExpression(untilCondition), body: repeatBody, line: line };
@@ -3688,7 +3810,7 @@ var Pseudo = (function () {
       }) : [];
       this.position += 1;
       var routineBody = this.parseBlock([kind === "PROCEDURE" ? "ENDPROCEDURE" : "ENDFUNCTION"]);
-      this.expectWord(kind === "PROCEDURE" ? "ENDPROCEDURE" : "ENDFUNCTION");
+      this.expectWord(kind === "PROCEDURE" ? "ENDPROCEDURE" : "ENDFUNCTION", line);
       return {
         type: "routine",
         kind: kind,
@@ -4221,7 +4343,270 @@ var Pseudo = (function () {
     }
   }
 
-  return { run: run };
+  /* ---------- Facts, lints and review ---------- */
+
+  function newFacts() {
+    return {
+      declares: [],
+      arrays: [],
+      inputs: 0,
+      outputs: [],
+      outputVariables: 0,
+      fors: [],
+      whiles: 0,
+      repeats: 0,
+      ifs: [],
+      routines: [],
+      calls: [],
+      assigns: [],
+      selfAssigns: [],
+      returns: 0,
+      reads: []
+    };
+  }
+
+  function collectNames(node, out) {
+    if (!node) return;
+    switch (node.type) {
+      case "name":
+        out.push(node.name);
+        return;
+      case "index":
+        out.push(node.name);
+        collectNames(node.index, out);
+        return;
+      case "index2":
+        out.push(node.name);
+        collectNames(node.row, out);
+        collectNames(node.column, out);
+        return;
+      case "unary":
+        collectNames(node.value, out);
+        return;
+      case "binary":
+        collectNames(node.left, out);
+        collectNames(node.right, out);
+        return;
+      case "call":
+        node.args.forEach(function (argument) {
+          collectNames(argument, out);
+        });
+        return;
+      default:
+        return;
+    }
+  }
+
+  function literalNumber(node) {
+    if (!node) return null;
+    if (node.type === "number") return node.value;
+    if (node.type === "unary" && node.op === "-" && node.value.type === "number") return -node.value.value;
+    return null;
+  }
+
+  function conditionInfo(test) {
+    var info = { op: null, names: [], otherNames: [] };
+    if (!test) return info;
+    if (test.type === "binary" && ["=", "<>", "<", ">", "<=", ">="].indexOf(test.op) !== -1) {
+      info.op = test.op;
+      collectNames(test.left, info.names);
+      collectNames(test.right, info.otherNames);
+      info.names = info.names.concat(info.otherNames);
+    }
+    return info;
+  }
+
+  function assignedNames(statements, out) {
+    statements.forEach(function (statement) {
+      switch (statement.type) {
+        case "assign":
+          out.push(statement.target.name);
+          break;
+        case "input":
+          statement.targets.forEach(function (target) {
+            if (target.type === "name") out.push(target.name);
+            if (target.type === "index") out.push(target.name);
+          });
+          break;
+        case "if":
+          assignedNames(statement.then, out);
+          assignedNames(statement.otherwise, out);
+          break;
+        case "for":
+        case "while":
+        case "repeat":
+          assignedNames(statement.body, out);
+          break;
+        case "routine":
+          assignedNames(statement.body, out);
+          break;
+        default:
+          break;
+      }
+    });
+    return out;
+  }
+
+  function collectFacts(statements, facts) {
+    statements.forEach(function (statement) {
+      switch (statement.type) {
+        case "declare":
+          statement.names.forEach(function (entry) {
+            facts.declares.push(entry.name);
+            if (entry.bounds) facts.arrays.push(entry.name);
+          });
+          break;
+        case "input":
+          facts.inputs += statement.targets.length;
+          statement.targets.forEach(function (target) {
+            if (target.type === "index") collectNames(target.index, facts.reads);
+          });
+          break;
+        case "output":
+          var variables = [];
+          statement.values.forEach(function (value) {
+            collectNames(value, variables);
+          });
+          facts.outputs.push({ count: statement.values.length, variables: variables.length });
+          facts.outputVariables += variables.length;
+          statement.values.forEach(function (value) {
+            collectNames(value, facts.reads);
+          });
+          break;
+        case "assign":
+          facts.assigns.push(statement.target.name);
+          var selfNames = [];
+          collectNames(statement.value, selfNames);
+          if (selfNames.indexOf(statement.target.name) !== -1 &&
+            statement.value.type === "binary" && statement.value.op === "+") {
+            facts.selfAssigns.push(statement.target.name);
+          }
+          if (statement.target.type === "index") collectNames(statement.target.index, facts.reads);
+          collectNames(statement.value, facts.reads);
+          break;
+        case "if":
+          var info = conditionInfo(statement.test);
+          facts.ifs.push({
+            op: info.op,
+            names: info.names,
+            assigned: assignedNames(statement.then, []),
+            line: statement.line
+          });
+          collectNames(statement.test, facts.reads);
+          collectFacts(statement.then, facts);
+          collectFacts(statement.otherwise, facts);
+          break;
+        case "for":
+          var from = literalNumber(statement.from);
+          var to = literalNumber(statement.to);
+          facts.fors.push({ name: statement.name, from: from, to: to, line: statement.line });
+          collectNames(statement.from, facts.reads);
+          collectNames(statement.to, facts.reads);
+          if (statement.step) collectNames(statement.step, facts.reads);
+          collectFacts(statement.body, facts);
+          break;
+        case "while":
+          facts.whiles += 1;
+          collectNames(statement.test, facts.reads);
+          collectFacts(statement.body, facts);
+          break;
+        case "repeat":
+          facts.repeats += 1;
+          collectNames(statement.test, facts.reads);
+          collectFacts(statement.body, facts);
+          break;
+        case "routine":
+          facts.routines.push({ name: statement.name, kind: statement.kind, params: statement.params });
+          collectFacts(statement.body, facts);
+          break;
+        case "call":
+          facts.calls.push(statement.name);
+          statement.args.forEach(function (argument) {
+            collectNames(argument, facts.reads);
+          });
+          break;
+        case "return":
+          facts.returns += 1;
+          collectNames(statement.value, facts.reads);
+          break;
+        default:
+          break;
+      }
+    });
+    return facts;
+  }
+
+  function lint(source, facts) {
+    var findings = [];
+    if (!String(source).trim()) {
+      return [{ level: "error", text: "The editor is empty. Start from the template." }];
+    }
+
+    if (!facts.outputs.length) {
+      findings.push({ level: "warn", text: "Nothing is ever OUTPUT, so a marker cannot see a result." });
+    } else if (facts.outputVariables === 0) {
+      findings.push({ level: "warn", text: "Every OUTPUT prints a fixed value. Print the variables so the output follows the input." });
+    }
+
+    var known = {};
+    facts.declares.forEach(function (name) { known[name] = true; });
+    facts.fors.forEach(function (loop) { known[loop.name] = true; });
+    facts.routines.forEach(function (routine) {
+      routine.params.forEach(function (param) { known[param] = true; });
+    });
+
+    var undeclared = [];
+    facts.reads.concat(facts.assigns).forEach(function (name) {
+      if (!known[name] && undeclared.indexOf(name) === -1) undeclared.push(name);
+    });
+    if (undeclared.length) {
+      findings.push({
+        level: "warn",
+        text: "Used without a DECLARE: " + undeclared.slice(0, 4).join(", ") +
+          ". A marker expects every variable to be declared first."
+      });
+    }
+
+    facts.fors.forEach(function (loop) {
+      if (facts.assigns.filter(function (name) { return name === loop.name; }).length &&
+        loop.line) {
+        findings.push({
+          level: "warn",
+          text: "Line " + loop.line + ": the FOR counter " + loop.name +
+            " is also assigned inside the program. Let the loop control it."
+        });
+      }
+    });
+
+    if (facts.routines.some(function (routine) { return routine.kind === "FUNCTION"; }) && facts.returns === 0) {
+      findings.push({ level: "warn", text: "A FUNCTION is declared but never uses RETURN." });
+    }
+
+    return findings;
+  }
+
+  function analyse(source) {
+    var program;
+    try {
+      program = new Program(source);
+      var statements = program.parseBlock([]);
+      if (program.position < program.lines.length) {
+        throw { message: "Unexpected " + program.lines[program.position].text, line: program.lines[program.position].line };
+      }
+      var facts = collectFacts(statements, newFacts());
+      return { ok: true, facts: facts, findings: lint(source, facts), error: null, line: 0 };
+    } catch (error) {
+      return {
+        ok: false,
+        facts: newFacts(),
+        findings: [],
+        error: error && error.message ? error.message : "Something in the program could not be read",
+        line: error && error.line ? error.line : 0
+      };
+    }
+  }
+
+  return { run: run, analyse: analyse };
 })();
 
 </script>
@@ -5312,6 +5697,14 @@ const CODE_WORKSPACES = {
   "cs-prog-1": {
     starterCode: "PROCEDURE LargestAndSmallest\n    DECLARE values : ARRAY[1:10] OF INTEGER\n    DECLARE largest, smallest, i : INTEGER\n\n    FOR i <- 1 TO 10\n        INPUT values[i]\n    NEXT i\n\n    largest <- values[1]\n    smallest <- values[1]\n\n    FOR i <- 2 TO 10\n        IF values[i] > largest THEN\n            largest <- values[i]\n        ENDIF\n        IF values[i] < smallest THEN\n            smallest <- values[i]\n        ENDIF\n    NEXT i\n\n    OUTPUT \"Largest: \", largest\n    OUTPUT \"Smallest: \", smallest\nEND PROCEDURE\n\nCALL LargestAndSmallest",
     sampleInput: "42\n3\n18\n99\n-4\n7\n7\n12\n0\n31",
+    review: [
+      { id: "declares-array", label: "Declares a 1D array for the ten values", fix: "Add DECLARE values : ARRAY[1:10] OF INTEGER before the loop." },
+      { id: "reads-input", label: "Reads the values with INPUT", fix: "Read each value with INPUT inside the loop." },
+      { id: "loops", label: "Loops through the values", fix: "Use FOR i <- 1 TO 10 … NEXT i." },
+      { id: "tracks-max", label: "Updates largest when a value is greater", fix: "Inside the loop: IF value > largest THEN largest <- value." },
+      { id: "tracks-min", label: "Updates smallest when a value is smaller", fix: "Inside the loop: IF value < smallest THEN smallest <- value." },
+      { id: "outputs-both", label: "Outputs both results", fix: "Add an OUTPUT line for largest and one for smallest." }
+    ],
     variables: ["i", "value", "largest", "smallest"],
     rows: [
       ["1", "42", "42", "42"],
@@ -5323,6 +5716,12 @@ const CODE_WORKSPACES = {
   "cs-alg-1": {
     starterCode: "DECLARE count : INTEGER\ncount <- 0\n\nFOR i <- 1 TO 5\n    count <- count + i\nNEXT i\n\nOUTPUT count",
     sampleInput: "",
+    review: [
+      { id: "declares", label: "Declares the variables it uses", fix: "Add DECLARE statements at the top." },
+      { id: "loops", label: "Uses a loop to repeat the work", fix: "Wrap the repeated steps in FOR … NEXT." },
+      { id: "accumulates", label: "Adds each value to a running total", fix: "Inside the loop: total <- total + value." },
+      { id: "outputs", label: "Outputs the result", fix: "Add an OUTPUT line at the end." }
+    ],
     variables: ["i", "count"],
     rows: [
       ["1", "1"],
@@ -7094,8 +7493,15 @@ const INSPECT_NOTES = {
   "code.toolbar": {
     title: "Editor toolbar",
     lines: [
-      "Run executes the pseudocode; Reset puts the starter code back.",
-      "The runner is a small local interpreter, not a real compiler."
+      "Run executes the pseudocode; Review checks it against the steps a marker looks for; Reset puts the starter code back.",
+      "The runner and the review are local, rule-based tools, not a real compiler or a live model."
+    ]
+  },
+  "code.review": {
+    title: "Code review",
+    lines: [
+      "Checks the code for the steps this question's mark scheme rewards, plus common mistakes.",
+      "It reads structure and names, not meaning: the feedback is rule-based and honest about it."
     ]
   },
   "code.console": {
@@ -7332,7 +7738,8 @@ SCREENS.forEach(function (screen) {
     close: svg('<path d="M6 6l12 12M18 6L6 18"></path>'),
     play: svg('<path d="M7 4l13 8-13 8z"></path>'),
     reset: svg('<path d="M4 4v6h6"></path><path d="M4.5 10a8 8 0 1 1 1.5 6"></path>'),
-    terminal: svg('<path d="M4 6h16v12H4z"></path><path d="M8 10l2 2-2 2"></path><path d="M13 14h4"></path>')
+    terminal: svg('<path d="M4 6h16v12H4z"></path><path d="M8 10l2 2-2 2"></path><path d="M13 14h4"></path>'),
+    spark: svg('<path d="M12 3l1.7 4.6L18.5 9.5l-4.8 1.9L12 16l-1.7-4.6L5.5 9.5l4.8-1.9z"></path><path d="M18 16.5l.8 2.1 2.2.9-2.2.9-.8 2.1-.8-2.1-2.2-.9 2.2-.9z"></path>')
   };
 
   var app = document.getElementById("app");
@@ -8456,10 +8863,37 @@ SCREENS.forEach(function (screen) {
           var workspace = CODE_WORKSPACES[codeQuestionId];
           draft.code = workspace ? workspace.starterCode : "// Write your pseudocode here\n";
           draft.result = null;
+          draft.review = null;
+          draft.reviewing = false;
           draft.fromSolution = "";
           renderScreen();
           wireScreen();
           refreshInspect();
+        });
+      }
+
+      var reviewCode = screen.querySelector("[data-review-code]");
+      if (reviewCode) {
+        reviewCode.addEventListener("click", function () {
+          var draft = codeDraftFor(codeQuestionId);
+          draft.code = codeEditor.value;
+          if (codeInput) draft.input = codeInput.value;
+          draft.reviewing = true;
+          draft.review = null;
+          renderScreen();
+          wireScreen();
+          refreshInspect();
+          var pendingId = codeQuestionId;
+          setTimeout(function () {
+            var pending = codeDraftFor(pendingId);
+            pending.review = buildReview(questionById(pendingId), pending.code);
+            pending.reviewing = false;
+            if (state.route === "/code/" + pendingId) {
+              renderScreen();
+              wireScreen();
+              refreshInspect();
+            }
+          }, 1100);
         });
       }
 
@@ -11146,10 +11580,119 @@ SCREENS.forEach(function (screen) {
         code: workspace.starterCode || "// Write your pseudocode here\n",
         input: workspace.sampleInput || "",
         result: null,
+        review: null,
+        reviewing: false,
         fromSolution: ""
       };
     }
     return state.codeDrafts[questionId];
+  }
+
+  function tracksExtreme(facts, op) {
+    return facts.ifs.some(function (info) {
+      return info.op === op && info.assigned.some(function (name) {
+        return info.names.indexOf(name) !== -1;
+      });
+    });
+  }
+
+  function criterionMet(id, facts) {
+    switch (id) {
+      case "declares": return facts.declares.length > 0;
+      case "declares-array": return facts.arrays.length > 0;
+      case "reads-input": return facts.inputs > 0;
+      case "loops": return facts.fors.length + facts.whiles + facts.repeats > 0;
+      case "tracks-max": return tracksExtreme(facts, ">");
+      case "tracks-min": return tracksExtreme(facts, "<");
+      case "outputs": return facts.outputs.length > 0;
+      case "outputs-both": return facts.outputVariables >= 2;
+      case "accumulates": return facts.selfAssigns.length > 0;
+      default: return false;
+    }
+  }
+
+  function buildReview(question, code) {
+    var workspace = CODE_WORKSPACES[question.id] || {};
+    var criteria = workspace.review || [];
+    var analysis = Pseudo.analyse(code);
+    var checks = criteria.map(function (criterion) {
+      return {
+        label: criterion.label,
+        fix: criterion.fix,
+        met: analysis.ok ? criterionMet(criterion.id, analysis.facts) : false
+      };
+    });
+    return {
+      ok: analysis.ok,
+      error: analysis.error,
+      line: analysis.line,
+      checks: checks,
+      findings: analysis.findings,
+      met: checks.filter(function (check) { return check.met; }).length,
+      total: checks.length
+    };
+  }
+
+  function CodeReviewPanel(question, draft) {
+    if (draft.reviewing) {
+      return `
+        <section class="review-card review-card--busy" data-inspect="code.review" aria-busy="true">
+          <div class="review-card__head">
+            <p class="eyebrow">Reviewing your code</p>
+            <span class="scan-dot" aria-hidden="true"></span>
+          </div>
+          <ul class="scan-steps">
+            <li>Reading the structure</li>
+            <li>Checking the steps a marker looks for</li>
+            <li>Writing feedback</li>
+          </ul>
+          <p class="muted">This review is rule-based and runs inside the page.</p>
+        </section>`;
+    }
+    if (!draft.review) return "";
+
+    var review = draft.review;
+    if (!review.ok) {
+      return `
+        <section class="review-card review-card--error" data-inspect="code.review">
+          <p class="eyebrow">Review stopped</p>
+          <p class="console__status console__status--error">Line ${review.line}: ${esc(review.error)}</p>
+          <p class="muted">Fix that line, then run the review again.</p>
+        </section>`;
+    }
+
+    return `
+      <section class="review-card" data-inspect="code.review">
+        <div class="review-card__head">
+          <div>
+            <p class="eyebrow">Code review · prototype</p>
+            <h2 class="subsection-title">What a marker looks for</h2>
+          </div>
+          <p class="review-card__score">${review.met} / ${review.total}</p>
+        </div>
+        <ul class="review-list">
+          ${review.checks.map(function (check) {
+            return `
+              <li class="review-item ${check.met ? "is-met" : "is-missing"}">
+                <span class="review-item__mark" aria-hidden="true">${check.met ? "✓" : "!"}</span>
+                <span class="review-item__body">
+                  <span class="review-item__label">${esc(check.label)}</span>
+                  ${check.met ? "" : '<span class="review-item__fix">' + esc(check.fix) + "</span>"}
+                </span>
+              </li>`;
+          }).join("")}
+        </ul>
+        ${review.findings.length ? `
+          <div class="review-findings">
+            <p class="field__label">Worth fixing</p>
+            <ul class="review-findings__list">
+              ${review.findings.map(function (finding) {
+                return '<li class="review-finding">' + esc(finding.text) + "</li>";
+              }).join("")}
+            </ul>
+          </div>` : ""}
+        <p class="field__hint">A rule-based review of the code you wrote. It checks structure and common mistakes, not meaning — no live model is involved.</p>
+      </section>`;
   }
 
   function codeLineNumbers(code) {
@@ -11244,6 +11787,7 @@ SCREENS.forEach(function (screen) {
                 <span class="code-window__name">question.pseudo</span>
                 <div class="actions-row">
                   <button type="button" class="btn btn--secondary btn--small" data-run-code>${ICONS.play} Run</button>
+                  <button type="button" class="btn btn--secondary btn--small" data-review-code>${ICONS.spark} Review</button>
                   <button type="button" class="btn btn--ghost btn--small" data-reset-code>${ICONS.reset} Reset</button>
                 </div>
               </div>
@@ -11260,6 +11804,8 @@ SCREENS.forEach(function (screen) {
               </div>
               <div data-code-output-text>${CodeConsole(draft.result)}</div>
             </div>
+
+            ${CodeReviewPanel(question, draft)}
           </section>
         </div>
 

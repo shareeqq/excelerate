@@ -249,6 +249,29 @@ test("every question figure is drawable", () => {
   });
 });
 
+test("pseudocode review analyses a correct program", () => {
+  const starter = data.CODE_WORKSPACES["cs-prog-1"];
+  const result = Pseudo.analyse(starter.starterCode);
+  assert(result.ok, "analyse failed: " + result.error + " (line " + result.line + ")");
+  assert(result.facts.arrays.length === 1, "array not detected");
+  assert(result.facts.fors.length === 2, "expected two loops, got " + result.facts.fors.length);
+  assert(result.facts.outputVariables >= 2, "outputs not detected");
+  assert(result.findings.length === 0, "unexpected findings: " + JSON.stringify(result.findings));
+});
+
+test("pseudocode review flags common mistakes", () => {
+  const noOutput = Pseudo.analyse("DECLARE x : INTEGER\nx <- 1");
+  assert(noOutput.ok, "should parse");
+  assert(noOutput.findings.some((item) => /OUTPUT/.test(item.text)), "missing OUTPUT not flagged");
+
+  const undeclared = Pseudo.analyse("OUTPUT total");
+  assert(undeclared.findings.some((item) => /DECLARE/.test(item.text)), "undeclared variable not flagged");
+
+  const broken = Pseudo.analyse("IF x > 1 THEN\nOUTPUT 1");
+  assert(!broken.ok, "an unclosed IF should fail");
+  assert(broken.line === 1, "expected line 1, got " + broken.line);
+});
+
 /* ---------- Runner ---------- */
 
 let failed = 0;
